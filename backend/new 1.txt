@@ -1,0 +1,26 @@
+A. Following PD Selection is correct but debug did not mention Ra's Signlord Ve while comparing: 
+----- Selecting PD for window 2015-01-01 00:00:00  ->  2016-01-01 00:00:00
+  RPS selection – candidates: Ra, Ju
+    -> matched RPS = Ju  => selected Ju
+  Multiple candidates for PD. Chosen = Ju  via RPS=Ju
+
+B. Slecting PR is slightly off it should select Ve because Ve as planet is higher than ve as signlord of Ra. So instead of Ra it should be Ve  
+----- Selecting PR for window 2015-01-01 00:00:00  ->  2016-01-01 00:00:00
+  RPS selection – candidates: Su, Mo, Ma, Ra, Ju, Sa, Me, Ke, Ve
+    -> RPS Ve matched Ra sign lord  => selected Ra
+  Multiple candidates for PR. Chosen = Ra  via RPS=Ve
+=> Final PR chosen: Ra  [2015-06-25 23:57:46 -> 2015-06-27 03:43:16]
+BTRDasaSelection written -> MD=Ve AD=Sa PD=Ju SU=Su PR=Ra
+  
+  
+  Rashi Lord is calculated using 
+  =VLOOKUP([@[Graha_Deg]],Deg_rasiLord,2) where Graha_Deg is Moon's degree 
+  
+  NL is calculated using 
+  =INDEX(VimOrder, GetNL_Sl_SSL_One([@[Graha_Deg]], 1), )
+  
+  SL is calculated using 
+  =INDEX(VimOrder, GetNL_Sl_SSL_One([@[Graha_Deg]], 2), )
+  
+  SSL is calculated using 
+  =INDEX(VimOrder, GetNL_Sl_SSL_One([@[Graha_Deg]], 3), )

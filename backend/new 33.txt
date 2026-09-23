@@ -1,0 +1,33 @@
+Original and 
+PLANET->	Ke	S	E	R	SSL	StrengthWise	Aspect : 90,180,60,120,240	
+PL	Ke	5, 3, 6, 9	8		11	Ke(Ard1)  |  --  |  5  |  --  |  8  |  N(Ra(Moo3→11, 2, 8, 9, 12, 5, 1, 10))  |  R(Me(Swa4→9, 3, 6))		1
+SGNL	Me	9, 3, 6	4, 12	3, 9	5	Me(Swa4)  |  (4)  |  9  |  3, 9  |  4, 12  |  A(Ma(Ash4→3, 7))  |  N(Ra(Moo3→11, 2, 8, 9, 12, 5, 1, 10))  |  R(Ve(Anu3→10))	Ma	-4
+NL	Ra	11, 2, 8, 9, 12, 5, 1, 10				Ra(Moo3)  |  --  |  11  |  --  |  --  |  A(Sa(Ard2→5, 1, 10, 11))  |  N(Ke(Ard1→5, 3, 6, 9))  |  R(Ju(UAs4→12, 2, 8, 9))	Sa	10
+NLNL	Ke	5, 3, 6, 9	8		11	Ke(Ard1)  |  --  |  5  |  --  |  8  |  N(Ra(Moo3→11, 2, 8, 9, 12, 5, 1, 10))  |  R(Me(Swa4→9, 3, 6))		1
+SL	Ra	11, 2, 8, 9, 12, 5, 1, 10				Ra(Moo3)  |  --  |  11  |  --  |  --  |  A(Sa(Ard2→5, 1, 10, 11))  |  N(Ke(Ard1→5, 3, 6, 9))  |  R(Ju(UAs4→12, 2, 8, 9))	Sa	10
+NLSL	Ke	5, 3, 6, 9	8		11	Ke(Ard1)  |  --  |  5  |  --  |  8  |  N(Ra(Moo3→11, 2, 8, 9, 12, 5, 1, 10))  |  R(Me(Swa4→9, 3, 6))		1
+SSL	Ve	10	5, 9	8, 10	2, 7, 8	Ve(Anu3)  |  --  |  10  |  8, 10  |  5, 9  |  A(Ma(Ash4→3, 7))  |  N(Sa(Ard2→5, 1, 10, 11))  |  R(Ma(Ash4→3, 7))	Ma	-14
+NLSSL	Sa	5, 1, 10, 11	7	5, 6, 7, 11, 12	3, 6, 9, 12	Sa(Ard2)  |  --  |  5  |  5, 6, 7, 11, 12  |  7  |  A(Ra(Moo3→11, 2, 8, 9, 12, 5, 1, 10))  |  N(Ra(Moo3→11, 2, 8, 9, 12, 5, 1, 10))  |  R(Me(Swa4→9, 3, 6))	Ra	10
+
+
+New
+PLANET->	Ke	A-Prime	B-Secondary	C-Supportive	DI-Bad	D2-Worse	D3-Worst	Strength / Aspect / Score
+PL	Ke		S: 5 | SSL: 11			E: 8		"Ke(Ard1)  |  --  |  5  |  --  |  8  |  N(Ra(Moo3→11, 2, 8, 9, 12, 5, 1, 10))  |  R(Me(Swa4→9, 3, 6))
+Score: -5."
+SGNL	Me		SSL: 5	S: 9 | R: 3	E: 4			"Me(Swa4)  |  (4)  |  9  |  3, 9  |  4, 12  |  A(Ma(Ash4→3, 7))  |  N(Ra(Moo3→11, 2, 8, 9, 12, 5, 1, 10))  |  R(Ve(Anu3→10))
+Score: -4."
+NL	Ra		S: 11					"Ra(Moo3)  |  --  |  11  |  --  |  --  |  A(Sa(Ard2→5, 1, 10, 11))  |  N(Ke(Ard1→5, 3, 6, 9))  |  R(Ju(UAs4→12, 2, 8, 9))
+Aspect: 5, 1, 10, 11
+Score: 2."
+NLNL	Ke		S: 5 | SSL: 11			E: 8		"Ke(Ard1)  |  --  |  5  |  --  |  8  |  N(Ra(Moo3→11, 2, 8, 9, 12, 5, 1, 10))  |  R(Me(Swa4→9, 3, 6))
+Score: -5."
+SL	Ra		S: 11					"Ra(Moo3)  |  --  |  11  |  --  |  --  |  A(Sa(Ard2→5, 1, 10, 11))  |  N(Ke(Ard1→5, 3, 6, 9))  |  R(Ju(UAs4→12, 2, 8, 9))
+Aspect: 5, 1, 10, 11
+Score: 2."
+NLSL	Ke		S: 5 | SSL: 11			E: 8		"Ke(Ard1)  |  --  |  5  |  --  |  8  |  N(Ra(Moo3→11, 2, 8, 9, 12, 5, 1, 10))  |  R(Me(Swa4→9, 3, 6))
+Score: -5."
+SSL	Ve		E: 5 | SSL: 2			S: 10 | R: 8		"Ve(Anu3)  |  --  |  10  |  8, 10  |  5, 9  |  A(Ma(Ash4→3, 7))  |  N(Sa(Ard2→5, 1, 10, 11))  |  R(Ma(Ash4→3, 7))
+Score: -14."
+NLSSL	Sa	E: 7	S: 5 | R: 5	SSL: 3				"Sa(Ard2)  |  --  |  5  |  5, 6, 7, 11, 12  |  7  |  A(Ra(Moo3→11, 2, 8, 9, 12, 5, 1, 10))  |  N(Ra(Moo3→11, 2, 8, 9, 12, 5, 1, 10))  |  R(Me(Swa4→9, 3, 6))
+Score: 10."
+

@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ORBINOVASTRO — AI App</title>
+<style>
+  :root {
+    --bg: #0f1220; --panel: #171b2e; --panel2: #1e2338; --border: #2b3152;
+    --text: #e8e9f3; --muted: #9aa0c3; --accent: #c9a44c; --accent-dim: #8a7237;
+    --user-bubble: #2a3560; --assistant-bubble: #1e2338; --beta: #7c8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); display: flex; flex-direction: column; min-height: 100vh;
+  }
+  header {
+    padding: 16px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  header .title { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: 0.02em; color: var(--accent); }
+  header p { margin: 0; color: var(--muted); font-size: 12.5px; }
+  #btn-clear { background: transparent; border: 1px solid var(--border); color: var(--muted);
+    padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; margin: 0; width: auto; }
+  #btn-clear:hover { color: var(--text); border-color: var(--accent-dim); }
+
+  main { flex: 1; display: grid; grid-template-columns: 380px 1fr; gap: 0; min-height: 0; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  section { padding: 20px 24px; overflow-y: auto; }
+  #panel-birth { border-right: 1px solid var(--border); background: var(--panel); }
+  #panel-content { display: flex; flex-direction: column; background: var(--bg); }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 14px; }
+  h3 { font-size: 13px; color: var(--accent); margin: 0 0 8px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  input {
+    width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--panel2); color: var(--text); font-size: 13px;
+  }
+  input:focus { outline: none; border-color: var(--accent-dim); }
+  .row { display: flex; gap: 8px; align-items: flex-end; }
+  .row > div { flex: 1; }
+  button {
+    margin-top: 16px; width: 100%; padding: 10px; border-radius: 6px; border: none;
+    background: var(--accent); color: #1a1508; font-weight: 600; cursor: pointer; font-size: 13px;
+  }
+  button:hover { opacity: 0.9; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-inline { width: auto !important; margin-top: 0 !important; padding: 8px 14px !important; flex: 0 0 auto; }
+  small.note { color: var(--muted); font-size: 11px; display: block; margin-top: 6px; line-height: 1.4; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12.5px; }
+  th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  .disclaimer {
+    margin-top: 14px; padding: 10px; border-radius: 6px; background: #2a2110;
+    border: 1px solid #4a3a18; color: #d9c48a; font-size: 11.5px; line-height: 1.5;
+  }
+  .error-box { margin-top: 10px; color: #e08a8a; font-size: 12.5px; }
+
+  /* ---- tab nav ---- */
+  nav.tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--border); padding: 0 0 12px; margin-bottom: 16px; flex-wrap: wrap; flex: 0 0 auto; }
+  nav.tabs button { width: auto; margin: 0; padding: 8px 14px; background: transparent; color: var(--muted);
+    border: 1px solid transparent; border-radius: 6px; font-weight: 500; font-size: 13px; }
+  nav.tabs button.active { background: var(--panel2); color: var(--accent); border-color: var(--border); }
+  nav.tabs button:hover:not(.active) { color: var(--text); }
+  .tab-panel { flex: 1; min-height: 0; }
+
+  /* ---- North Indian chart wheel ---- */
+  .ni-chart-wrap { max-width: 380px; margin: 4px auto 20px; }
+  .ni-chart { width: 100%; height: auto; display: block; }
+  .ni-chart text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+  /* ---- chat tab ---- */
+  #tab-chat { flex-direction: column; }
+  #messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-bottom: 12px; min-height: 0; }
+  .bubble-row { display: flex; flex-direction: column; max-width: 82%; }
+  .bubble-row.user { align-self: flex-end; align-items: flex-end; }
+  .bubble-row.assistant { align-self: flex-start; align-items: flex-start; }
+  .bubble { padding: 10px 14px; border-radius: 12px; font-size: 13.5px; line-height: 1.55; }
+  .bubble.user { background: var(--user-bubble); border-bottom-right-radius: 3px; }
+  .bubble.assistant { background: var(--assistant-bubble); border: 1px solid var(--border); border-bottom-left-radius: 3px; }
+  .bubble.system-note { align-self: center; color: var(--muted); font-size: 12px; font-style: italic; background: none; border: none; padding: 4px; }
+  .bubble h3 { font-size: 13.5px; margin: 10px 0 4px; color: var(--accent); }
+  .bubble ul { margin: 4px 0; padding-left: 18px; }
+  .bubble p { margin: 6px 0; }
+  .bubble strong { color: #fff; }
+  .tool-tag {
+    font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--beta);
+    border: 1px solid var(--beta); border-radius: 4px; padding: 1px 6px; margin-bottom: 4px; display: inline-block;
+  }
+  .typing-dots span { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--muted);
+    margin: 0 2px; animation: blink 1.2s infinite ease-in-out; }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+
+  #chat-input-row { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); flex: 0 0 auto; }
+  #chat-input-row input { flex: 1; }
+  #chat-input-row button { width: auto; margin-top: 0; padding: 10px 18px; }
+  .suggestions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .chip {
+    font-size: 11.5px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px;
+    padding: 5px 12px; cursor: pointer; background: var(--panel2);
+  }
+  .chip:hover { color: var(--text); border-color: var(--accent-dim); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">
+    <h1>ORBINOVASTRO — AI App</h1>
+    <p>Swiss Ephemeris chart &amp; transit engine · OpenAI chat · <span style="color:var(--beta)">KP significators (beta)</span></p>
+  </div>
+  <button id="btn-clear">Clear conversation</button>
+</header>
+
+<main>
+  <section id="panel-birth">
+    <h2>Birth Details — used by Chart, Transit, KP &amp; Chat</h2>
+    <label>Name</label>
+    <input id="f-name" placeholder="Client name" />
+    <div class="row">
+      <div><label>Year</label><input id="f-year" type="number" value="1990" /></div>
+      <div><label>Month</label><input id="f-month" type="number" min="1" max="12" value="1" /></div>
+      <div><label>Day</label><input id="f-day" type="number" min="1" max="31" value="1" /></div>
+    </div>
+    <div class="row">
+      <div><label>Hour (0-23)</label><input id="f-hour" type="number" min="0" max="23" value="12" /></div>
+      <div><label>Minute</label><input id="f-minute" type="number" min="0" max="59" value="0" /></div>
+      <div><label>UTC offset</label><input id="f-tz" type="number" step="0.25" value="5.5" /></div>
+    </div>
+    <label>Place</label>
+    <div class="row">
+      <div><input id="f-place" placeholder="City, Country" /></div>
+      <button id="btn-geocode" type="button" class="btn-inline">Look up</button>
+    </div>
+    <div id="geocode-note"></div>
+    <div class="row">
+      <div><label>Latitude</label><input id="f-lat" type="number" step="0.0001" value="28.6139" /></div>
+      <div><label>Longitude</label><input id="f-lon" type="number" step="0.0001" value="77.2090" /></div>
+    </div>
+    <small class="note">"Look up" fills latitude/longitude/UTC offset from the place name (using the date above, so historical daylight-saving is accounted for) — you can still edit them by hand afterward.</small>
+  </section>
+
+  <section id="panel-content">
+    <nav class="tabs">
+      <button id="nav-chart" data-tab="chart" class="active">Chart</button>
+      <button id="nav-transit" data-tab="transit">Transit</button>
+      <button id="nav-kp" data-tab="kp">KP Significators <span style="color:var(--beta)">(beta)</span></button>
+      <button id="nav-chat" data-tab="chat">Chat</button>
+    </nav>
+
+    <div id="tab-chart" class="tab-panel">
+      <h2>Natal Chart</h2>
+      <button id="btn-compute">Compute Chart</button>
+      <div id="chart-result"></div>
+    </div>
+
+    <div id="tab-transit" class="tab-panel" style="display:none">
+      <h2>Transit</h2>
+      <div class="row">
+        <div><label>Date (blank = right now)</label><input id="t-date" type="date" /></div>
+        <div><label>Time</label><input id="t-time" type="time" /></div>
+      </div>
+      <small class="note">Uses the UTC offset from Birth Details for this date/time too. Leave both blank to see the transit for this exact moment.</small>
+      <button id="btn-transit">Compute Transit</button>
+      <div id="transit-result"></div>
+    </div>
+
+    <div id="tab-kp" class="tab-panel" style="display:none">
+      <h2>KP Significators <span class="tool-tag" style="margin-left:6px">Beta</span></h2>
+      <button id="btn-kp">Compute KP Significators (beta)</button>
+      <div id="kp-result"></div>
+    </div>
+
+    <div id="tab-chat" class="tab-panel" style="display:none">
+      <h2>Chat</h2>
+      <div id="messages"></div>
+      <div class="suggestions" id="suggestions">
+        <span class="chip" data-q="What sign is my Moon in?">Moon sign?</span>
+        <span class="chip" data-q="What are the significators of my 10th house? (beta)">10th house significators (beta)</span>
+        <span class="chip" data-q="What is my ascendant and its lord?">Ascendant &amp; lord</span>
+        <span class="chip" data-q="What planets are transiting my chart right now?">Current transits?</span>
+      </div>
+      <div id="chat-input-row">
+        <input id="f-chat" placeholder="Ask about the chart, or just tell me your birth details..." />
+        <button id="btn-send">Send</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const STORAGE_KEY = "orbino_state_v1";
+let lastBirthDetails = null;
+let chatHistory = [];   // [{role, content}]
+
+// ---------- tiny, dependency-free markdown renderer (headers/bold/lists/paragraphs) ----------
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function renderMarkdown(raw) {
+  const lines = escapeHtml(raw).split("\n");
+  let html = ""; let inList = false;
+  const closeList = () => { if (inList) { html += "</ul>"; inList = false; } };
+  for (let line of lines) {
+    line = line.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    if (/^###\s+/.test(line)) { closeList(); html += `<h3>${line.replace(/^###\s+/, "")}</h3>`; continue; }
+    if (/^\s*[-*]\s+/.test(line)) {
+      if (!inList) { html += "<ul>"; inList = true; }
+      html += `<li>${line.replace(/^\s*[-*]\s+/, "")}</li>`; continue;
+    }
+    closeList();
+    if (line.trim() === "") { continue; }
+    html += `<p>${line}</p>`;
+  }
+  closeList();
+  return html || escapeHtml(raw);
+}
+
+// ---------- persistence ----------
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      chatHistory, lastBirthDetails, form: currentBirthDetails(),
+    }));
+  } catch (e) { /* private browsing / storage disabled -- fail silently */ }
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    chatHistory = data.chatHistory || [];
+    lastBirthDetails = data.lastBirthDetails || null;
+    if (data.form) {
+      for (const [id, val] of Object.entries(data.form)) {
+        const el = document.getElementById("f-" + id.replace(/_/g, "-").replace("utc-offset-hours", "tz")
+          .replace("latitude", "lat").replace("longitude", "lon"));
+        if (el) el.value = val;
+      }
+    }
+    for (const m of chatHistory) addBubble(m.role, m.content, false);
+  } catch (e) { /* corrupted/blocked storage -- start fresh */ }
+}
+function clearState() {
+  try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+  chatHistory = []; lastBirthDetails = null;
+  document.getElementById("messages").innerHTML = "";
+}
+
+function val(id) { return document.getElementById(id).value; }
+function num(id) { return Number(document.getElementById(id).value); }
+
+function currentBirthDetails() {
+  return {
+    name: val("f-name"), place: val("f-place"),
+    year: num("f-year"), month: num("f-month"), day: num("f-day"),
+    hour: num("f-hour"), minute: num("f-minute"), second: 0,
+    utc_offset_hours: num("f-tz"), latitude: num("f-lat"), longitude: num("f-lon"),
+  };
+}
+
+// ---------- tab navigation ----------
+const TABS = ["chart", "transit", "kp", "chat"];
+function showTab(name) {
+  if (!TABS.includes(name)) name = "chart";
+  for (const t of TABS) {
+    const panel = document.getElementById("tab-" + t);
+    const navBtn = document.getElementById("nav-" + t);
+    if (t === name) {
+      panel.style.display = (t === "chat") ? "flex" : "block";
+      navBtn.classList.add("active");
+    } else {
+      panel.style.display = "none";
+      navBtn.classList.remove("active");
+    }
+  }
+  try { localStorage.setItem(STORAGE_KEY + "_tab", name); } catch (e) {}
+}
+
+// ---------- North Indian chart wheel (SVG) ----------
+// Exact polygon coordinates for the classic North Indian diamond layout,
+// derived from a 400x400 square: outer square + both diagonals + the
+// diamond connecting the four side-midpoints. Houses 1/4/7/10 (the
+// "kendra" kite shapes) sit at the four midpoints; the remaining 8 houses
+// are the corner triangles the diagonals cut each corner into.
+const NI_HOUSES = {
+  1:  { poly: "200,0 100,100 200,200 300,100",  cx: 200, cy: 95  },
+  2:  { poly: "400,0 200,0 300,100",             cx: 300, cy: 38  },
+  3:  { poly: "400,0 400,200 300,100",           cx: 358, cy: 100 },
+  4:  { poly: "400,200 300,100 200,200 300,300", cx: 305, cy: 200 },
+  5:  { poly: "400,200 400,400 300,300",         cx: 358, cy: 300 },
+  6:  { poly: "400,400 200,400 300,300",         cx: 300, cy: 362 },
+  7:  { poly: "200,400 300,300 200,200 100,300", cx: 200, cy: 305 },
+  8:  { poly: "200,400 0,400 100,300",           cx: 100, cy: 362 },
+  9:  { poly: "0,400 0,200 100,300",              cx: 42,  cy: 300 },
+  10: { poly: "0,200 100,300 200,200 100,100",   cx: 95,  cy: 200 },
+  11: { poly: "0,200 0,0 100,100",                cx: 42,  cy: 100 },
+  12: { poly: "0,0 200,0 100,100",                cx: 100, cy: 38  },
+};
+
+function signAbbrev(sign) { return (sign || "").slice(0, 3); }
+
+function northIndianChartSVG(data) {
+  const houseSign = {};
+  for (const h of data.houses) houseSign[h.house] = h.sign;
+  const planetsByHouse = {};
+  for (let i = 1; i <= 12; i++) planetsByHouse[i] = [];
+  for (const p of data.planets) {
+    if (planetsByHouse[p.house]) planetsByHouse[p.house].push(p);
+  }
+
+  let svg = `<svg viewBox="0 0 400 400" class="ni-chart" xmlns="http://www.w3.org/2000/svg">`;
+  for (const [num, h] of Object.entries(NI_HOUSES)) {
+    const isAsc = Number(num) === 1;
+    svg += `<polygon points="${h.poly}" fill="${isAsc ? "var(--panel2)" : "transparent"}" stroke="var(--border)" stroke-width="1.5"/>`;
+  }
+  svg += `<rect x="1" y="1" width="398" height="398" fill="none" stroke="var(--border)" stroke-width="2"/>`;
+  for (const [num, h] of Object.entries(NI_HOUSES)) {
+    const houseNum = Number(num);
+    const sign = houseSign[houseNum] || "";
+    const planets = planetsByHouse[houseNum];
+    let tspans = `<tspan x="${h.cx}" dy="0" fill="var(--accent)" font-weight="600">${escapeHtml(signAbbrev(sign))}</tspan>`;
+    planets.forEach((p) => {
+      tspans += `<tspan x="${h.cx}" dy="12" fill="var(--text)">${escapeHtml(p.code)}${p.retrograde ? "ᴿ" : ""}</tspan>`;
+    });
+    svg += `<text x="${h.cx}" y="${h.cy}" text-anchor="middle" font-size="11">${tspans}</text>`;
+  }
+  svg += `<text x="200" y="14" text-anchor="middle" font-size="9" fill="var(--muted)">ASC ↑</text>`;
+  svg += `</svg>`;
+  return svg;
+}
+
+// ---------- Chart tab ----------
+function renderChart(data) {
+  const el = document.getElementById("chart-result");
+  let html = `<div id="ni-chart-wrap" class="ni-chart-wrap">${northIndianChartSVG(data)}</div>`;
+  html += `<div><strong>Ascendant:</strong> ${data.ascendant.sign} (lord ${data.ascendant.sign_lord}), ${data.ascendant.longitude.toFixed(2)}°</div>`;
+  html += `<div style="margin-top:4px;color:var(--muted)">Ayanamsa: ${data.ayanamsa_mode}, ${data.ayanamsa_deg.toFixed(3)}°</div>`;
+  html += "<table><tr><th>Planet</th><th>Sign</th><th>Deg</th><th>Nakshatra</th><th>Pada</th><th>House</th></tr>";
+  for (const p of data.planets) {
+    html += `<tr><td>${p.name}${p.retrograde ? " (R)" : ""}</td><td>${p.sign}</td><td>${p.degree_in_sign.toFixed(2)}</td><td>${p.nakshatra}</td><td>${p.pada}</td><td>${p.house}</td></tr>`;
+  }
+  html += "</table>";
+  html += `<div class="disclaimer">${data.disclaimer}</div>`;
+  el.innerHTML = html;
+}
+
+async function computeChart() {
+  const btn = document.getElementById("btn-compute");
+  btn.disabled = true; btn.textContent = "Computing...";
+  try {
+    const body = currentBirthDetails();
+    const res = await fetch("/api/chart", {
+      method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    const data = await res.json();
+    lastBirthDetails = body;
+    renderChart(data);
+    saveState();
+  } catch (e) {
+    document.getElementById("chart-result").innerHTML = `<div class="error-box">Error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = "Compute Chart";
+  }
+}
+
+// ---------- Geocode ----------
+async function doGeocode() {
+  const btn = document.getElementById("btn-geocode");
+  const note = document.getElementById("geocode-note");
+  const place = val("f-place");
+  if (!place.trim()) {
+    note.innerHTML = '<small class="note" style="color:#e08a8a">Enter a place name first.</small>';
+    return;
+  }
+  btn.disabled = true; btn.textContent = "...";
+  note.innerHTML = '<small class="note">Looking up...</small>';
+  try {
+    const res = await fetch("/api/geocode", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        place, year: num("f-year"), month: num("f-month"), day: num("f-day"),
+        hour: num("f-hour"), minute: num("f-minute"),
+      }),
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    const data = await res.json();
+    document.getElementById("f-lat").value = data.latitude;
+    document.getElementById("f-lon").value = data.longitude;
+    if (data.utc_offset_hours !== null && data.utc_offset_hours !== undefined) {
+      document.getElementById("f-tz").value = data.utc_offset_hours;
+    }
+    let msg = `${data.place} — ${data.timezone_name || "timezone unknown"}`;
+    if (data.utc_offset_hours !== null && data.utc_offset_hours !== undefined) {
+      msg += `, UTC${data.utc_offset_hours >= 0 ? "+" : ""}${data.utc_offset_hours}`;
+    }
+    if (data.note) msg += " — " + data.note;
+    note.innerHTML = `<small class="note" style="color:var(--accent)">${escapeHtml(msg)}</small>`;
+    saveState();
+  } catch (e) {
+    note.innerHTML = `<small class="note" style="color:#e08a8a">Error: ${escapeHtml(e.message)}</small>`;
+  } finally {
+    btn.disabled = false; btn.textContent = "Look up";
+  }
+}
+
+// ---------- Transit tab ----------
+async function computeTransit() {
+  const btn = document.getElementById("btn-transit");
+  btn.disabled = true; btn.textContent = "Computing...";
+  const resultEl = document.getElementById("transit-result");
+  try {
+    const birth = currentBirthDetails();
+    const dateVal = val("t-date");
+    const timeVal = val("t-time");
+    let transit = null;
+    if (dateVal) {
+      const [y, m, d] = dateVal.split("-").map(Number);
+      let hh = 12, mm = 0;
+      if (timeVal) { const parts = timeVal.split(":").map(Number); hh = parts[0]; mm = parts[1]; }
+      transit = { year: y, month: m, day: d, hour: hh, minute: mm, utc_offset_hours: birth.utc_offset_hours };
+    }
+    const res = await fetch("/api/transit", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ birth, transit }),
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    const data = await res.json();
+    renderTransit(data);
+  } catch (e) {
+    resultEl.innerHTML = `<div class="error-box">Error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = "Compute Transit";
+  }
+}
+
+function renderTransit(data) {
+  const el = document.getElementById("transit-result");
+  let html = `<div style="color:var(--muted);font-size:12px;margin:10px 0 4px">As of ${data.transit_time_utc} UTC (${data.transit_time_source})</div>`;
+  html += "<table><tr><th>Planet</th><th>Sign</th><th>Deg</th><th>Nakshatra</th><th>Natal House</th><th>Conjuncts</th></tr>";
+  for (const p of data.planets) {
+    html += `<tr><td>${p.name}${p.retrograde ? " (R)" : ""}</td><td>${p.sign}</td><td>${p.degree_in_sign.toFixed(2)}</td><td>${p.nakshatra}</td><td>${p.natal_house}</td><td>${p.conjuncts_natal.join(", ") || "—"}</td></tr>`;
+  }
+  html += "</table>";
+  html += `<div class="disclaimer">${data.disclaimer}</div>`;
+  el.innerHTML = html;
+}
+
+// ---------- KP Significators (beta) tab ----------
+const PLANET_NAME = {Su:"Sun", Mo:"Moon", Ma:"Mars", Me:"Mercury", Ju:"Jupiter", Ve:"Venus", Sa:"Saturn", Ra:"Rahu", Ke:"Ketu"};
+
+async function computeKP() {
+  const btn = document.getElementById("btn-kp");
+  btn.disabled = true; btn.textContent = "Computing...";
+  const resultEl = document.getElementById("kp-result");
+  try {
+    const body = currentBirthDetails();
+    const res = await fetch("/api/kp-beta", {
+      method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    const data = await res.json();
+    renderKP(data);
+  } catch (e) {
+    resultEl.innerHTML = `<div class="error-box">Error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = "Compute KP Significators (beta)";
+  }
+}
+
+function renderKP(data) {
+  const el = document.getElementById("kp-result");
+  let html = `<div class="disclaimer">${data.beta_disclaimer}</div>`;
+  html += '<div style="margin-top:18px"><h3>Planet Sub Lords</h3><table><tr><th>Planet</th><th>Nakshatra</th><th>Nakshatra Lord</th><th>Sub Lord</th><th>House</th></tr>';
+  for (const [code, info] of Object.entries(data.planet_sub_lords)) {
+    html += `<tr><td>${PLANET_NAME[code] || code}</td><td>${info.nakshatra}</td><td>${info.nakshatra_lord}</td><td><strong>${info.sub_lord}</strong></td><td>${info.house}</td></tr>`;
+  }
+  html += "</table></div>";
+  html += '<div style="margin-top:18px"><h3>House Significators</h3><table><tr><th>House</th><th>Occupants</th><th>Owner</th><th>Star Lord (Occ.)</th><th>Star Lord (Owner)</th><th>Cuspal Sub Lord</th></tr>';
+  for (const h of data.house_significators) {
+    html += `<tr><td>${h.house}</td><td>${h.occupants.join(", ") || "—"}</td><td>${h.owner}</td><td>${h.star_lord_of_occupants.join(", ") || "—"}</td><td>${h.star_lord_of_owner.join(", ") || "—"}</td><td><strong>${h.cuspal_sub_lord}</strong></td></tr>`;
+  }
+  html += "</table></div>";
+  el.innerHTML = html;
+}
+
+// ---------- Chat tab ----------
+function addBubble(role, text, persist = true) {
+  const wrap = document.getElementById("messages");
+  const row = document.createElement("div");
+  row.className = "bubble-row " + role;
+  const bubble = document.createElement("div");
+  bubble.className = "bubble " + role;
+  if (role === "assistant") bubble.innerHTML = renderMarkdown(text);
+  else bubble.textContent = text;
+  row.appendChild(bubble);
+  wrap.appendChild(row);
+  wrap.scrollTop = wrap.scrollHeight;
+  if (persist) { chatHistory.push({role, content: text}); saveState(); }
+  return bubble;
+}
+
+async function sendChat(presetText) {
+  const input = document.getElementById("f-chat");
+  const text = (presetText !== undefined ? presetText : input.value).trim();
+  if (!text) return;
+  input.value = "";
+  addBubble("user", text);
+
+  const btn = document.getElementById("btn-send");
+  btn.disabled = true;
+
+  // placeholder assistant bubble with a typing indicator, filled in as tokens stream
+  const wrap = document.getElementById("messages");
+  const row = document.createElement("div");
+  row.className = "bubble-row assistant";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble assistant";
+  bubble.innerHTML = '<span class="typing-dots"><span></span><span></span><span></span></span>';
+  row.appendChild(bubble);
+  wrap.appendChild(row);
+  wrap.scrollTop = wrap.scrollHeight;
+
+  let toolTag = "";
+  let accumulated = "";
+  const TOOL_LABELS = {
+    compute_kp_significators_beta: "BETA · KP significators",
+    compute_chart: "chart engine",
+    compute_transit: "transit engine",
+    geocode_place: "place lookup",
+  };
+
+  try {
+    const res = await fetch("/api/chat/stream", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({messages: chatHistory, birth_details: lastBirthDetails}),
+    });
+    if (!res.ok || !res.body) {
+      let detail = res.statusText;
+      try { detail = (await res.json()).detail || detail; } catch (e) {}
+      throw new Error(detail);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const events = buf.split("\n\n");
+      buf = events.pop(); // last chunk may be incomplete
+      for (const evt of events) {
+        const line = evt.trim();
+        if (!line.startsWith("data:")) continue;
+        const payload = JSON.parse(line.slice(5).trim());
+        if (payload.type === "tool_used") {
+          const label = TOOL_LABELS[payload.name] || payload.name;
+          toolTag = `<span class="tool-tag">${label}</span><br/>`;
+        } else if (payload.type === "token") {
+          accumulated += payload.text;
+          bubble.innerHTML = toolTag + renderMarkdown(accumulated);
+          wrap.scrollTop = wrap.scrollHeight;
+        } else if (payload.type === "error") {
+          throw new Error(payload.detail);
+        }
+      }
+    }
+    chatHistory.push({role: "user", content: text});
+    chatHistory.push({role: "assistant", content: accumulated});
+    saveState();
+  } catch (e) {
+    bubble.innerHTML = "";
+    row.className = "bubble-row";
+    bubble.className = "bubble system-note";
+    bubble.textContent = "Error: " + e.message;
+    // roll back the optimistic user message push (it wasn't added to history on failure)
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById("btn-compute").addEventListener("click", computeChart);
+document.getElementById("btn-geocode").addEventListener("click", doGeocode);
+document.getElementById("btn-transit").addEventListener("click", computeTransit);
+document.getElementById("btn-kp").addEventListener("click", computeKP);
+document.getElementById("btn-send").addEventListener("click", () => sendChat());
+document.getElementById("f-chat").addEventListener("keydown", (e) => { if (e.key === "Enter") sendChat(); });
+document.getElementById("btn-clear").addEventListener("click", clearState);
+document.querySelectorAll(".chip").forEach(chip => {
+  chip.addEventListener("click", () => { showTab("chat"); sendChat(chip.dataset.q); });
+});
+document.querySelectorAll("nav.tabs button").forEach(b => {
+  b.addEventListener("click", () => showTab(b.dataset.tab));
+});
+
+loadState();
+let initialTab = "chart";
+try { initialTab = localStorage.getItem(STORAGE_KEY + "_tab") || "chart"; } catch (e) {}
+showTab(initialTab);
+</script>
+</body>
+</html>

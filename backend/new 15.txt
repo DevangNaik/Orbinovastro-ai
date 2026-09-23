@@ -1,0 +1,1 @@
+python -m astro_kp_ai.cli --name "Example Client" --date 1973-10-12 --time 14:55  --tz "Asia/Kolkata" --lat 20.85 --lon 72.92 --ayanamsa lahiri --out chart.json

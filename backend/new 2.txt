@@ -1,0 +1,32 @@
+ord Choice
+Warning!
+Your resume has 2 word(s) that are not adding relevant value to your resume and should be removed or replaced.
+
+Like Matrix
+Verb Choice
+Warning!
+Your resume has 3 verb(s) that should be replaced with action verbs that better describe your work contributions.
+
+Led Built Oversaw
+Personal Pronouns
+Warning!
+Your resume has 2 personal pronoun(s). Since your resume is a document about your self, using these pronouns is redundant and wastes space. For example instead of: "I increased revenue by $10,000", You should use: "Increased revenue by $10,000".
+
+We Its
+
+
+creening Questions:
+
+Current notice period or earliest availability to start: Not required . Available now
+
+What salary range would you consider for this role (USD)? 300k=-325k
+
+Are there any location, travel, or flexibility preferences (e.g., hybrid, remote, relocation)?
+Prefer Onsite/Hybrid in Atlanta area or Remote roles for other cities in US. 
+
+How does your experience align with strategic planning, enterprise architecture governance, and executive communications?
+I have 10 plus years of experience in strategic planning including enterprice architecture governance and managing executive communications in various companies like Ameren, Interface, Cognizant(clients) and Ciber(Clients)
+
+
+Briefly describe a key strategic initiative you led that delivered measurable business impact.
+I led an enterprise-wide technology prioritization and planning initiative for a Fortune 500 organization, establishing standardized roadmapping, architecture governance, and capacity planning across multiple engineering domains. This enabled leadership to align investment decisions with growth priorities, improved resource utilization by ~20%, introduced KPI-driven performance management, and delivered over $200M in long-term cost optimization while strengthening operational scalability and execution discipline.

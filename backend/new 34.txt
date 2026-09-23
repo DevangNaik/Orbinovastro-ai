@@ -1,0 +1,229 @@
+=LET(
+    HouseCalc,
+    LAMBDA(house,
+        LET(
+            =LET(
+  house, CY346,
+  hdr, HSTACK(house,{"CSGNLD","CNL","CSL","ConnectedPl","S","E","R","sCalc","eCalc","rCalc","SGN2","NL2","SL2","owocc","nlof","slof"}),
+  topRow, IFERROR(
+            INDEX(
+              CHOOSECOLS(HTbl,3,4,6),
+              MATCH(house,HTbl[House],0)
+            ),
+            ""
+          ),
+  basePl, topRow,
+  _check, IF(basePl="", hdr, "proceed"),
+  sgnldRaw,   IFERROR(XLOOKUP(basePl,PlTbl[Planet],PlTbl[SGNLD]),""),
+  nlRaw,      IFERROR(XLOOKUP(basePl,PlTbl[Planet],PlTbl[NL]),""),
+  nlofnlRaw,  IFERROR(XLOOKUP(basePl,PlTbl[Planet],PlTbl[NLOFNL]),""),
+  slRaw,      IFERROR(XLOOKUP(basePl,PlTbl[Planet],PlTbl[SL]),""),
+  nlofslRaw,  IFERROR(XLOOKUP(basePl,PlTbl[Planet],PlTbl[NLOFSL]),""),
+  dec, LAMBDA(x,
+        IF(x="","",
+          LET(
+            L, IFERROR(XLOOKUP(x,PlTbl[Planet],PlTbl[SGNLD]),""),
+            IF((x="Ra")+(x="Ke"), x & "-" & L, x)
+          )
+        )
+      ),
+  planet,   dec(basePl),
+  SGNLDd,   dec(sgnldRaw),
+  NLd0,     dec(nlRaw),
+  NLOFNLd,  dec(nlofnlRaw),
+  SLd0,     dec(slRaw),
+  NLOFSLd,  dec(nlofslRaw),
+  rowLbl, {"RPLANET";"RSGNLD";"RNL";"RNLOFNL";"RSL";"RNLOFSL"},
+  mat0,   VSTACK(planet,SGNLDd,NLd0,NLOFNLd,SLd0,NLOFSLd),
+  rMat,   ROWS(mat0),
+  cSG, IFERROR(INDEX(mat0,,1),""),
+  cNL, IFERROR(INDEX(mat0,,2),""),
+  cSL, IFERROR(INDEX(mat0,,3),""),
+  keySL, LEFT(TRIM(cSL),2),
+  utFlag, IF(keySL="","",IFERROR(XLOOKUP(keySL,PlTbl[Planet],PlTbl[UT]),"")),
+  cSLnew, IF(utFlag<>"", keySL & "*", cSL),
+  cNLnew, IF(utFlag<>"",
+             IF(cNL="","", cNL & ", ") & keySL & "*",
+             cNL
+          ),
+  mat, HSTACK(cSG,cNLnew,cSLnew),
+  sgColDec, cSG,
+  nlColDec, cNLnew,
+  slColDec, cSLnew,
+  expandCol, LAMBDA(vec,
+    LET(
+      txt,   TEXTJOIN(",",TRUE,vec),
+      noStar,SUBSTITUTE(txt,"*",""),
+      norm,  SUBSTITUTE(SUBSTITUTE(noStar," ",""),"-",","),
+      parts, IFERROR(TEXTSPLIT(norm,","), SEQUENCE(1,1,"")),
+      result, IFERROR(FILTER(parts, parts<>""), ""),
+      IF(result="", {""}, result)
+    )
+  ),
+  setSG, IFERROR(UNIQUE(expandCol(sgColDec)), {""}),
+  setNL, IFERROR(UNIQUE(expandCol(nlColDec)), {""}),
+  setSL, IFERROR(UNIQUE(expandCol(slColDec)), {""}),
+  conn0, IFERROR(
+           FILTER(
+             setSG,
+             ISNUMBER(MATCH(setSG,setNL,0)) *
+             ISNUMBER(MATCH(setSG,setSL,0))
+           ),
+           {""}
+         ),
+  connList, IFERROR(UNIQUE(FILTER(TOCOL(conn0), TOCOL(conn0)<>"")), {""}),
+  rConn, ROWS(connList),
+  connCol, IFERROR(
+             MAKEARRAY(
+               rMat, 1,
+               LAMBDA(r,c,
+                 IF(r<=rConn, IFERROR(INDEX(connList,r),""), "")
+               )
+             ),
+             SEQUENCE(rMat,1,"")
+           ),
+  cp, connCol,
+  cpKey, LEFT(TRIM(cp),2),
+  sCol, IF(cpKey="","", XLOOKUP(cpKey, PlTbl[Planet], PlTbl[S], "")),
+  eCol, IF(cpKey="","", XLOOKUP(cpKey, PlTbl[Planet], PlTbl[E], "")),
+  rCol, IF(cpKey="","", XLOOKUP(cpKey, PlTbl[Planet], PlTbl[R], "")),
+  SCalcCol, IF(cpKey="","", XLOOKUP(cpKey, PlTbl[Planet], PlTbl[sCalc], "")),
+  ECalcCol, IF(cpKey="","", XLOOKUP(cpKey, PlTbl[Planet], PlTbl[eCalc], "")),
+  RCalcCol, IF(cpKey="","", XLOOKUP(cpKey, PlTbl[Planet], PlTbl[rCalc], "")),
+  uniqueSL, IFERROR(UNIQUE(FILTER(setSL, setSL<>"")), {""}),
+  findSecondary, LAMBDA(slPlanet,
+    LET(
+      inSG, ISNUMBER(MATCH(slPlanet, setSG, 0)),
+      inNL, ISNUMBER(MATCH(slPlanet, setNL, 0)),
+      signLord, IFERROR(XLOOKUP(slPlanet, PlTbl[Planet], PlTbl[SGNLD]), ""),
+      case_2col, IF((inSG + inNL) = 1,
+        LET(
+          missingCol, IF(inSG, setNL, setSG),
+          signLordInMissing, ISNUMBER(MATCH(signLord, missingCol, 0)),
+          IF(signLordInMissing,
+            IF(inSG, slPlanet & "-" & signLord & "-" & slPlanet, signLord & "-" & slPlanet & "-" & slPlanet),
+            ""
+          )
+        ),
+        ""
+      ),
+      case_1col, IF((inSG + inNL) = 0,
+        LET(
+          signLordInSG, ISNUMBER(MATCH(signLord, setSG, 0)),
+          signLordInNL, ISNUMBER(MATCH(signLord, setNL, 0)),
+          IF(signLordInSG * signLordInNL,
+            signLord & "-" & signLord & "-" & slPlanet,
+            ""
+          )
+        ),
+        ""
+      ),
+      result, IF(case_2col<>"", case_2col, case_1col),
+      IF(result="", "", result)
+    )
+  ),
+  secondaryRaw, MAKEARRAY(ROWS(uniqueSL), 1,
+    LAMBDA(r,c,
+      LET(
+        slPl, INDEX(uniqueSL, r, 1),
+        IF(slPl="", "", findSecondary(slPl))
+      )
+    )
+  ),
+  secondaryList, IFERROR(FILTER(secondaryRaw, secondaryRaw<>""), {""}),
+  rSecondary, ROWS(secondaryList),
+  parseSec, LAMBDA(secStr,
+    IF(secStr="", {"","",""},
+      LET(
+        parts, TEXTSPLIT(secStr, "-"),
+        nParts, COLUMNS(parts),
+        IF(nParts=3, parts, {"","",""})
+      )
+    )
+  ),
+  SGN2Col, MAKEARRAY(rMat, 1,
+    LAMBDA(r,c,
+      IF(r<=rSecondary,
+        LET(
+          secStr, INDEX(secondaryList, r, 1),
+          parsed, parseSec(secStr),
+          INDEX(parsed, 1, 1)
+        ),
+        ""
+      )
+    )
+  ),
+  NL2Col, MAKEARRAY(rMat, 1,
+    LAMBDA(r,c,
+      IF(r<=rSecondary,
+        LET(
+          secStr, INDEX(secondaryList, r, 1),
+          parsed, parseSec(secStr),
+          INDEX(parsed, 1, 2)
+        ),
+        ""
+      )
+    )
+  ),
+  SL2Col, MAKEARRAY(rMat, 1,
+    LAMBDA(r,c,
+      IF(r<=rSecondary,
+        LET(
+          secStr, INDEX(secondaryList, r, 1),
+          parsed, parseSec(secStr),
+          INDEX(parsed, 1, 3)
+        ),
+        ""
+      )
+    )
+  ),
+  owoccCol, MAKEARRAY(rMat, 1,
+    LAMBDA(r,c,
+      IF(r<=rSecondary,
+        LET(
+          sgnPl, INDEX(SGN2Col, r, 1),
+          IF(sgnPl="", "", IFERROR(XLOOKUP(sgnPl, PlTbl[Planet], PlTbl[OW/OCC]), ""))
+        ),
+        ""
+      )
+    )
+  ),
+  nlofCol, MAKEARRAY(rMat, 1,
+    LAMBDA(r,c,
+      IF(r<=rSecondary,
+        LET(
+          nlPl, INDEX(NL2Col, r, 1),
+          IF(nlPl="", "", IFERROR(XLOOKUP(nlPl, PlTbl[Planet], PlTbl[NLOF]), ""))
+        ),
+        ""
+      )
+    )
+  ),
+  slofCol, MAKEARRAY(rMat, 1,
+    LAMBDA(r,c,
+      IF(r<=rSecondary,
+        LET(
+          slPl, INDEX(SL2Col, r, 1),
+          IF(slPl="", "", IFERROR(XLOOKUP(slPl, PlTbl[Planet], PlTbl[SLOF]), ""))
+        ),
+        ""
+      )
+    )
+  ),
+  body, IFERROR(
+          HSTACK(rowLbl, mat, connCol, sCol, eCol, rCol, SCalcCol, ECalcCol, RCalcCol, SGN2Col, NL2Col, SL2Col, owoccCol, nlofCol, slofCol),
+          HSTACK(rowLbl, mat, SEQUENCE(rMat,16,""))
+        ),
+  VSTACK(hdr, body)
+)
+        )
+    ),
+
+    REDUCE(
+        HouseCalc(1),
+        SEQUENCE(11,,2),
+        LAMBDA(acc,house,
+            VSTACK(acc,HouseCalc(house))
+        )
+    )
+)

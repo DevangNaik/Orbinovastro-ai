@@ -1,0 +1,3 @@
+As you know this code generates the connectivity different scores (individual, weighted, and weighted with NoSSL ) and duration of the event in days, months and years for each planet based on MD Sequence in the GG20:GL20 range.  
+My goal is to output all the connected planets for each future MD Sequence in the future the future date is availabe in the VimDasaTbl in get workshet -For each combination you may find 1 to 9 planets planets connected at 1-6 levels but if they are not connected i do not need to output if the planets are not connected e.g.0 at all MD-to DEH level.  
+Output will be MDSequence then the table output as you printed.. using 19-20 columns using the 

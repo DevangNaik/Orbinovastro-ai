@@ -1,0 +1,114 @@
+Client_Index
+
+let
+    DbPath =
+        Text.Trim(
+            Text.From(
+                Excel.CurrentWorkbook()
+                {[Name="AccessDBPath"]}[Content]{0}[Column1]
+            )
+        ),
+
+    Connection =
+        "Provider=Microsoft.ACE.OLEDB.12.0;" &
+        "Data Source=" & DbPath & ";",
+
+    Source =
+        OleDb.Query(
+            Connection,
+            "
+            SELECT [SrNo], [Name]
+            FROM [DOB_Database]
+            WHERE
+                [SrNo] IS NOT NULL
+                AND [Name] IS NOT NULL
+                AND LEN(TRIM([Name]))>0
+            ORDER BY [Name], [SrNo];
+            "
+        ),
+
+    Clean =
+        Table.TransformColumns(
+            Source,
+            {
+                {"Name", each Text.Trim(Text.From(_)), type text}
+            }
+        ),
+
+    Types =
+        Table.TransformColumnTypes(
+            Clean,
+            {
+                {"SrNo", Int64.Type},
+                {"Name", type text}
+            }
+        ),
+    #"Sorted Rows" = Table.Sort(Types,{{"SrNo", Order.Ascending}})
+in
+    #"Sorted Rows"
+	
+	
+	-------------------------
+	Client_Index_Selected
+	
+	let
+    GetID =
+        (RangeName as text) as nullable number =>
+            try
+                Number.From(
+                    Excel.CurrentWorkbook()
+                    {[Name=RangeName]}[Content]{0}[Column1]
+                )
+            otherwise
+                null,
+
+    NatalID = GetID("selNatalID"),
+    TransitID = GetID("selTransitID"),
+    AstrologerID = GetID("selAstrologerID"),
+
+    SelectedIDs =
+        List.Distinct(
+            List.RemoveNulls(
+                {
+                    NatalID,
+                    TransitID,
+                    AstrologerID
+                }
+            )
+        ),
+
+    IDList =
+        Text.Combine(
+            List.Transform(
+                SelectedIDs,
+                each Number.ToText(_, "0", "en-US")
+            ),
+            ","
+        ),
+
+    DbPath =
+        Text.Trim(
+            Text.From(
+                Excel.CurrentWorkbook()
+                {[Name="AccessDBPath"]}[Content]{0}[Column1]
+            )
+        ),
+
+    Connection =
+        "Provider=Microsoft.ACE.OLEDB.12.0;" &
+        "Data Source=" & DbPath & ";",
+
+    SQL =
+        if List.Count(SelectedIDs)=0 then
+            "SELECT TOP 0 * FROM [DOB_Database]"
+        else
+            "SELECT * FROM [DOB_Database] " &
+            "WHERE [SrNo] IN (" & IDList & ")",
+
+    Source =
+        OleDb.Query(
+            Connection,
+            SQL
+        )
+in
+    Source

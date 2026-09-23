@@ -1,0 +1,13 @@
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.6
+pyswisseph>=2.10
+openai>=1.30
+python-dotenv>=1.0
+pytest>=8.0
+anyio>=4.0
+requests>=2.31
+timezonefinder>=6.5
+tzdata>=2024.1
+pyjwt>=2.8
+stripe>=7.0

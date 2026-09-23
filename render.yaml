@@ -1,0 +1,21 @@
+# Render Blueprint -- lets Render read this repo and pre-fill a new Web
+# Service's settings automatically ("New +" -> "Blueprint" in the Render
+# dashboard, pointed at this repo). You can also skip this file entirely
+# and configure the same settings by hand in the dashboard -- see DEPLOY.md.
+services:
+  - type: web
+    name: orbinovastro-ai
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false        # set manually in the dashboard -- never commit this
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: ALLOWED_ORIGINS
+        sync: false        # set to your Sites URL + https://orbinovastro.com
+      - key: AUTH_ENABLED
+        value: "false"

@@ -1,0 +1,78 @@
+let
+    Source = #"FullAnalysisConnection",
+
+    // Read CurrentDBASPD from Excel named range
+    CurrentDBASPD_raw =
+        let
+            t = Excel.CurrentWorkbook(){[Name="CurrentDBASPD"]}[Content],
+            firstRow = t{0},
+            firstCol = Table.ColumnNames(t){0}
+        in
+            Text.From(Record.Field(firstRow, firstCol)),
+
+    Normalize = (x as any) as text =>
+        let
+            txt = if x = null then "" else Text.From(x),
+            trimmed = Text.Trim(Text.Clean(txt)),
+            noNbsp = Text.Replace(trimmed, Character.FromNumber(160), ""),
+            lettersOnly = Text.Select(noNbsp, {"A".."Z","a".."z"}),
+            upper = Text.Upper(lettersOnly)
+        in
+            upper,
+
+    CurrentDBASPD = Normalize(CurrentDBASPD_raw),
+
+    WithNorm = Table.AddColumn(Source, "DBASPD_NORM", each Normalize([DBASPD]), type text),
+
+    Filtered = Table.SelectRows(WithNorm, each [DBASPD_NORM] = CurrentDBASPD),
+
+    Final = Table.RemoveColumns(Filtered, {"DBASPD_NORM"})
+in
+    Final
+	
+	
+	
+	
+	
+	
+	2. 
+	let
+    Source = #"DetailedConnectivity_ALL",
+
+    // Read CurrentDBASPD from Excel named range
+    CurrentDBASPD_raw =
+        let
+            t = Excel.CurrentWorkbook(){[Name="SelectedDBASPD"]}[Content],
+            firstRow = t{0},
+            firstCol = Table.ColumnNames(t){0}
+        in
+            Text.From(Record.Field(firstRow, firstCol)),
+
+    Normalize = (x as any) as text =>
+        let
+            txt = if x = null then "" else Text.From(x),
+            trimmed = Text.Trim(Text.Clean(txt)),
+            noNbsp = Text.Replace(trimmed, Character.FromNumber(160), ""),
+            lettersOnly = Text.Select(noNbsp, {"A".."Z","a".."z"}),
+            upper = Text.Upper(lettersOnly)
+        in
+            upper,
+
+    CurrentDBASPD = Normalize(CurrentDBASPD_raw),
+
+    WithNorm = Table.AddColumn(Source, "DBASPD_NORM", each Normalize([DBASPD]), type text),
+
+    Filtered = Table.SelectRows(WithNorm, each [DBASPD_NORM] = CurrentDBASPD),
+
+    Final = Table.RemoveColumns(Filtered, {"DBASPD_NORM"})
+in
+    Final
+	
+	
+	3.
+	let
+    Source = Csv.Document(File.Contents("C:\KPCache\DetailedConnectivity_ALL.csv"),[Delimiter=",", Columns=30, Encoding=1252, QuoteStyle=QuoteStyle.None]),
+    #"Promoted Headers" = Table.PromoteHeaders(Source, [PromoteAllScalars=true]),
+    #"Changed Type" = Table.TransformColumnTypes(#"Promoted Headers",{{"VimRow", Int64.Type}, {"DBASPD", type text}, {"ConnectedPlanet", type text}, {"Planet", type text}, {"MD", Int64.Type}, {"AD", Int64.Type}, {"PD", Int64.Type}, {"SU", Int64.Type}, {"PRANA", Int64.Type}, {"DEH", Int64.Type}, {"LevelsConnected", Int64.Type}, {"Freq_Total", Int64.Type}, {"Freq_NLType", Int64.Type}, {"Score", Int64.Type}, {"WTDSCORE", type number}, {"WTDSCORE_NOSSL", type number}, {"StartRow", Int64.Type}, {"EndRow", Int64.Type}, {"StartDate", type datetime}, {"EndDate", type datetime}, {"DurDays", type number}, {"DurYears", type number}, {"DurMonths", type number}, {"IsActive", type logical}, {"DeliveryScore", type number}, {"ResultQuality", type text}, {"ResultQualityNum", Int64.Type}, {"DeliveryStrength", type text}, {"DeliveryStrengthNum", Int64.Type}, {"PriorityRank", Int64.Type}})
+in
+    #"Changed Type"

@@ -1,0 +1,18 @@
+# Never commit real secrets -- backend/.env holds your OpenAI/Supabase/Stripe
+# keys. .env.example (committed) has the field names only, no real values.
+backend/.env
+.env
+
+# Local subscriber DB (created automatically once AUTH_ENABLED=true) --
+# per-deployment state, not source code.
+backend/subscribers.db
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# OS/editor cruft
+.DS_Store
+.vscode/

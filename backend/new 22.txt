@@ -1,0 +1,6 @@
+Facebook
+: -
+: -
+: -
+: -
+This project focuses on systematically evaluating model responses across multiple quality dimensions. You'll review several model-generated answers and compare them using structured criteria. Based on these evaluations, assign preference rankings that reflect which responses best satisfy the prompt's intent and demonstrate strong reasoning and communication.
