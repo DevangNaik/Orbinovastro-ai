@@ -1,9 +1,22 @@
 """Orchestration: turn API input (BirthDetailsIn) into a NatalChart and
 back into plain dicts/JSON-friendly shapes. Kept separate from ephemeris.py
-so the pure-astronomy code has no FastAPI/pydantic dependency."""
+so the pure-astronomy code has no FastAPI/pydantic dependency.
+
+Each planet carries TWO house numbers, both valid, answering different
+questions:
+  - "house": Bhava Chalit -- which Placidus cusp segment the planet's
+    exact longitude falls in. This is what KP practice (kp.py's
+    significators) uses.
+  - "rasi_house": classical D1/Rasi -- whole-sign house counted from the
+    ascendant's own sign. This is the traditional North Indian/South
+    Indian diagram convention. The two usually agree but can differ for
+    a planet near a house cusp -- showing both is intentional, not a bug."""
 from __future__ import annotations
 
-from .ephemeris import BirthMoment, NatalChart, compute_natal_chart
+from .ephemeris import (
+    BirthMoment, NatalChart, compute_natal_chart,
+    sign_index_for_longitude, whole_sign_house,
+)
 from .kp import house_of_longitude
 
 
@@ -22,6 +35,7 @@ def build_chart_from_fields(
 
 def chart_to_dict(chart: NatalChart) -> dict:
     cusp_longitudes = [h.longitude for h in chart.houses]
+    asc_sign_index = sign_index_for_longitude(chart.ascendant.longitude)
     return {
         "ayanamsa_deg": round(chart.ayanamsa_deg, 4),
         "ayanamsa_mode": chart.ayanamsa_mode,
@@ -53,6 +67,9 @@ def chart_to_dict(chart: NatalChart) -> dict:
                 "pada": p.pada,
                 "retrograde": p.retrograde,
                 "house": house_of_longitude(p.longitude, cusp_longitudes),
+                "rasi_house": whole_sign_house(
+                    sign_index_for_longitude(p.longitude), asc_sign_index
+                ),
             }
             for p in chart.planets
         ],

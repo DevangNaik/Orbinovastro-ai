@@ -4,17 +4,27 @@ Endpoints:
   GET  /api/auth-config   -> public: whether sign-in is turned on, + Supabase project info
   POST /api/billing/webhook -> Stripe subscription events (inert until configured)
   POST /api/geocode      -> place name -> lat/lon/UTC offset (no LLM call)
-  POST /api/chart        -> mechanical-layer natal chart (no LLM call)
+  POST /api/chart        -> mechanical-layer natal chart (no LLM call); each
+                             planet includes both a Bhava Chalit house
+                             ("house") and a classical D1/Rasi whole-sign
+                             house ("rasi_house") -- see engine/chart.py
   POST /api/kp-beta       -> BETA: KP sub lords + significators (no LLM call)
+  POST /api/navamsa       -> BETA: D9 Navamsa divisional chart (no LLM call)
   POST /api/transit       -> mechanical-layer transit vs natal chart (no LLM call)
+  POST /api/teaser        -> free client-facing preview (ascendant/Moon sign
+                              + blurb + booking link) -- NOT gated behind a
+                              subscription; its whole purpose is to attract
+                              visitors who haven't paid yet
   POST /api/chat          -> chat with the OpenAI assistant (non-streaming)
   POST /api/chat/stream   -> same, but Server-Sent Events token streaming
   GET  /                  -> serves the frontend (frontend/index.html)
 
-All of /api/geocode, /api/chart, /api/kp-beta, /api/transit, /api/chat*
-are gated behind require_active_subscription (see app/auth.py) -- a no-op
-today (AUTH_ENABLED=false by default) and enforced once the client sets
-up Supabase Auth + Stripe Billing and flips that flag on.
+All of /api/geocode, /api/chart, /api/kp-beta, /api/navamsa, /api/transit,
+/api/chat* are gated behind require_active_subscription (see app/auth.py)
+-- a no-op today (AUTH_ENABLED=false by default) and enforced once the
+client sets up Supabase Auth + Stripe Billing and flips that flag on.
+/api/teaser is deliberately NOT gated, even once auth is on -- see its
+docstring below.
 
 Run locally:
   uvicorn app.main:app --reload --port 8000
@@ -44,10 +54,13 @@ from .engine.chart import build_chart_from_fields, chart_to_dict
 from .engine.geocode import GeocodeError, geocode_and_resolve_offset
 from .engine.ephemeris import BirthMoment
 from .engine.kp import compute_kp_beta
+from .engine.teaser import build_teaser
 from .engine.transit import compute_transit, now_as_birth_moment
+from .engine.varga import compute_navamsa
 from .models import (
     BirthDetailsIn, ChartOut, ChatRequestIn, ChatResponseOut,
     GeocodeOut, GeocodeRequestIn, KPBetaOut,
+    NavamsaOut, NavamsaPlanetOut, TeaserOut,
     TransitOut, TransitPlanetOut, TransitRequestIn,
 )
 
@@ -151,6 +164,54 @@ def api_kp_beta(body: BirthDetailsIn, _user=Depends(require_active_subscription)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=400, detail=f"Could not compute KP beta data: {exc}") from exc
     return KPBetaOut(**data)
+
+
+@app.post("/api/navamsa", response_model=NavamsaOut)
+def api_navamsa(body: BirthDetailsIn, _user=Depends(require_active_subscription)) -> NavamsaOut:
+    """BETA: D9 Navamsa divisional chart, standard textbook formula. See
+    engine/varga.py module docstring for exactly what this is and isn't."""
+    try:
+        chart = build_chart_from_fields(
+            year=body.year, month=body.month, day=body.day,
+            hour=body.hour, minute=body.minute, second=body.second,
+            utc_offset_hours=body.utc_offset_hours,
+            latitude=body.latitude, longitude=body.longitude,
+        )
+        nav = compute_navamsa(chart)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"Could not compute Navamsa: {exc}") from exc
+    return NavamsaOut(
+        ascendant_navamsa_sign=nav.ascendant_navamsa_sign,
+        ascendant_navamsa_sign_lord=nav.ascendant_navamsa_sign_lord,
+        planets=[NavamsaPlanetOut(**vars(p)) for p in nav.planets],
+        beta_disclaimer=nav.beta_disclaimer,
+    )
+
+
+@app.post("/api/teaser", response_model=TeaserOut)
+def api_teaser(body: BirthDetailsIn) -> TeaserOut:
+    """Free client-facing preview: ascendant + Moon sign (validated
+    mechanical layer) paired with a short general-personality blurb and a
+    link to book the full paid consultation. Deliberately NOT gated
+    behind require_active_subscription -- see module docstring above and
+    engine/teaser.py."""
+    try:
+        chart = build_chart_from_fields(
+            year=body.year, month=body.month, day=body.day,
+            hour=body.hour, minute=body.minute, second=body.second,
+            utc_offset_hours=body.utc_offset_hours,
+            latitude=body.latitude, longitude=body.longitude,
+        )
+        teaser = build_teaser(
+            chart, name=body.name,
+            book_url=os.environ.get("BOOKING_URL", "https://orbinovastro.square.site/s/appointments"),
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"Could not compute preview: {exc}") from exc
+    return TeaserOut(
+        ascendant_sign=teaser.ascendant_sign, moon_sign=teaser.moon_sign,
+        headline=teaser.headline, blurb=teaser.blurb, book_url=teaser.book_url,
+    )
 
 
 @app.post("/api/transit", response_model=TransitOut)

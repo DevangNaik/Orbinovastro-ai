@@ -31,7 +31,8 @@ class PlanetOut(BaseModel):
     nakshatra_lord: str
     pada: int
     retrograde: bool
-    house: int
+    house: int = Field(description="Bhava Chalit house (Placidus cusp), used by KP practice")
+    rasi_house: int = Field(description="Classical D1/Rasi house (whole-sign, from the ascendant's sign)")
 
 
 class HouseOut(BaseModel):
@@ -50,10 +51,14 @@ class ChartOut(BaseModel):
     houses: list[HouseOut]
     planets: list[PlanetOut]
     disclaimer: str = (
-        "Mechanical-layer chart only: planetary/house positions computed "
-        "via Swiss Ephemeris (Krishnamurti ayanamsa, standard stand-in "
-        "pending client confirmation of the workbook's exact ayanamsa). "
-        "Does NOT include KP significators, divisional charts beyond D1, "
+        "Mechanical-layer chart only, all positions Nirayana (sidereal): "
+        "planetary/house positions computed via Swiss Ephemeris "
+        "(Krishnamurti ayanamsa, standard stand-in pending client "
+        "confirmation of the workbook's exact ayanamsa). Each planet's "
+        "'house' is Bhava Chalit (Placidus cusp); 'rasi_house' is the "
+        "classical D1 whole-sign house. Does NOT include KP significators "
+        "(see /api/kp-beta), the D9 Navamsa divisional chart (see "
+        "/api/navamsa, also beta), divisional charts beyond D1/D9, "
         "dasha/bhukti selection, or connection-scoring -- those parts of "
         "the engine are not yet ported/validated."
     )
@@ -63,6 +68,35 @@ class KPBetaOut(BaseModel):
     beta_disclaimer: str
     planet_sub_lords: dict
     house_significators: list
+
+
+class NavamsaPlanetOut(BaseModel):
+    code: str
+    name: str
+    navamsa_sign: str
+    navamsa_sign_lord: str
+    navamsa_house: int = Field(description="Whole-sign house within the D9 chart, from the D9 ascendant's own sign")
+
+
+class NavamsaOut(BaseModel):
+    ascendant_navamsa_sign: str
+    ascendant_navamsa_sign_lord: str
+    planets: list[NavamsaPlanetOut]
+    beta_disclaimer: str
+
+
+class TeaserOut(BaseModel):
+    ascendant_sign: str
+    moon_sign: str
+    headline: str
+    blurb: str
+    book_url: str
+    disclaimer: str = (
+        "A free preview only -- ascendant and Moon sign from the "
+        "validated mechanical layer, paired with general sign-level "
+        "description. Not a personalized reading; book a consultation "
+        "for that."
+    )
 
 
 class GeocodeRequestIn(BaseModel):

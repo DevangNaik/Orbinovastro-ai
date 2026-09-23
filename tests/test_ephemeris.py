@@ -12,7 +12,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 
-from app.engine.ephemeris import BirthMoment, compute_natal_chart, normalize360
+from app.engine.chart import chart_to_dict
+from app.engine.ephemeris import (
+    BirthMoment, compute_natal_chart, normalize360,
+    sign_index_for_longitude, whole_sign_house,
+)
 
 
 def _reference_chart():
@@ -62,3 +66,41 @@ def test_nakshatra_pada_in_range():
     chart = _reference_chart()
     for p in chart.planets:
         assert 1 <= p.pada <= 4
+
+
+def test_whole_sign_house_ascendant_own_sign_is_house_one():
+    # A planet in the same sign as the ascendant is always in the 1st
+    # whole-sign house, regardless of which sign that actually is.
+    for asc_idx in range(12):
+        assert whole_sign_house(asc_idx, asc_idx) == 1
+
+
+def test_whole_sign_house_counts_forward_and_wraps():
+    # Ascendant in Aries (index 0): Taurus (1) -> house 2, ... Pisces (11) -> house 12.
+    assert whole_sign_house(1, 0) == 2
+    assert whole_sign_house(11, 0) == 12
+    # Ascendant in Pisces (index 11): Aries (0) -> house 2 (wraps).
+    assert whole_sign_house(0, 11) == 2
+
+
+def test_sign_index_for_longitude_matches_sign_for_longitude():
+    from app.engine.ephemeris import RASHI_NAMES, sign_for_longitude
+    for lon in [0.0, 29.99, 30.0, 143.2, 359.9]:
+        sign, _lord, _deg = sign_for_longitude(lon)
+        assert RASHI_NAMES[sign_index_for_longitude(lon)] == sign
+
+
+def test_rasi_house_of_ascendant_sign_planet_is_house_one():
+    chart = _reference_chart()
+    data = chart_to_dict(chart)
+    asc_sign = data["ascendant"]["sign"]
+    for p in data["planets"]:
+        if p["sign"] == asc_sign:
+            assert p["rasi_house"] == 1
+
+
+def test_every_planet_has_valid_rasi_house():
+    chart = _reference_chart()
+    data = chart_to_dict(chart)
+    for p in data["planets"]:
+        assert 1 <= p["rasi_house"] <= 12

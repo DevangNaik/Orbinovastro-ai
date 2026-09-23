@@ -152,6 +152,25 @@ def sign_for_longitude(sid_long: float) -> tuple[str, str, float]:
     return RASHI_NAMES[sign_index], RASHI_LORD[sign_index], degree_in_sign
 
 
+def sign_index_for_longitude(sid_long: float) -> int:
+    """0-11 index into RASHI_NAMES/RASHI_LORD for a sidereal longitude."""
+    return int(normalize360(sid_long) // 30) % 12
+
+
+def whole_sign_house(occupant_sign_index: int, ascendant_sign_index: int) -> int:
+    """Classical Rasi/D1 (and divisional-chart) house placement: houses
+    counted by SIGN from the ascendant's own sign (house 1 = whichever
+    sign the ascendant occupies), not by Placidus cusp degree. This is
+    the traditional D1 diagram convention used across most Vedic
+    software, and the standard convention for divisional (varga) charts.
+
+    Distinct from the cuspal (Bhava Chalit) house placement used
+    elsewhere in this engine for KP practice -- see kp.house_of_longitude
+    for that one. The two can disagree for a planet near a house cusp;
+    showing both side by side is intentional (see roadmap doc)."""
+    return (occupant_sign_index - ascendant_sign_index) % 12 + 1
+
+
 def nakshatra_for_longitude(sid_long: float) -> tuple[str, str, int]:
     sid_long = normalize360(sid_long)
     nak_index = int(sid_long // NAKSHATRA_SPAN)

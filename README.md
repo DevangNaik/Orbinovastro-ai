@@ -32,19 +32,43 @@ feature-complete replacement for the production workbook.
     conjunctions with natal planets. Mechanical layer, not beta — but does
     NOT include transit-to-natal aspects (trine/square/opposition),
     dasha/bhukti overlay, or any event-timing judgment.
-  - An **OpenAI-powered chat agent** with four tools (chart, KP-beta,
-    geocode, transit), available both as a normal JSON response
-    (`/api/chat`) and as a **token-by-token streaming** response over
-    Server-Sent Events (`/api/chat/stream`).
+  - **Two house-placement conventions on every `/api/chart` planet**: `house`
+    (Bhava Chalit — which Placidus cusp segment the planet's exact degree
+    falls into, the KP convention already used elsewhere in this app) and
+    the new **`rasi_house`** (classical D1/Rasi whole-sign house, counted by
+    sign distance from the ascendant's own sign). Both validated mechanical
+    layer, shown side by side — not a bug when they disagree near a cusp.
+  - A **BETA D9 Navamsa divisional chart engine** (`engine/varga.py`,
+    `/api/navamsa`): standard textbook Navamsa formula (movable/fixed/dual
+    sign starting-point rule, implemented as an equivalent continuous
+    108-part division of the zodiac) — sign and whole-sign house placement
+    for each planet in the D9 chart. Labeled beta because it hasn't yet been
+    cross-checked against the client's own workbook output.
+  - A **client-facing "teaser" preview generator** (`engine/teaser.py`,
+    `/api/teaser`): a free, deterministic, template-text preview (ascendant
+    + Moon sign framing, no predictions or significators) meant to entice a
+    site visitor into booking the paid consultation — ends with a link to
+    the Square booking page. Intentionally **not** gated behind
+    subscription/sign-in, even once auth is turned on, since its entire job
+    is to reach visitors who haven't paid yet.
+  - An **OpenAI-powered chat agent** with five tools (chart, KP-beta,
+    Navamsa-beta, geocode, transit), available both as a normal JSON
+    response (`/api/chat`) and as a **token-by-token streaming** response
+    over Server-Sent Events (`/api/chat/stream`).
   - **Optional user accounts, MFA, and subscription gating** (`auth.py`,
     `billing.py`) — built and tested, but **off by default**
     (`AUTH_ENABLED=false`). See "User accounts, MFA & subscription gating"
     below for what this is and the setup steps still needed on your end.
-- A **menu-driven single-page frontend** (`frontend/index.html`) — four
-  tabs sharing one Birth Details panel:
-  - **Chart** — computes the chart and draws it as a real **North Indian
-    diamond-style chart wheel** (not just a table), signs and planets
-    placed by house, retrograde planets marked.
+- A **menu-driven single-page frontend** (`frontend/index.html`) — tabs
+  sharing one Birth Details panel:
+  - **Preview** — the free client-facing "candy": headline + blurb from
+    `/api/teaser` and a prominent "Book Your Full Reading" button linking to
+    the Square booking page. Meant to be the entry point for new visitors.
+  - **Chart** — now three linked reference views instead of one: **D1
+    (Rasi)** (whole-sign houses, `rasi_house`), **Bhava Chalit** (cuspal
+    houses, `house`), and **D9 (Navamsa, beta)** (`/api/navamsa`) — all
+    explicitly labeled **Nirayana** (sidereal), drawn as real **North Indian
+    diamond-style chart wheels**, retrograde planets marked.
   - **Transit** — pick a date (or leave blank for right now) and see where
     the planets currently are relative to the natal chart.
   - **KP Significators (beta)** — Sub Lords and house significators, in
@@ -53,9 +77,9 @@ feature-complete replacement for the production workbook.
     conversation memory (`localStorage`) and suggestion chips.
   - A **"Look up" button** next to the Place field calls the geocode
     endpoint and fills in latitude/longitude/UTC offset automatically.
-- **Tests**: 28 passing —
-  `test_ephemeris.py` (6), `test_kp_beta.py` (5), `test_geocode.py` (5),
-  `test_transit.py` (4), `test_auth.py` (8).
+- **Tests**: 50 passing — `test_ephemeris.py`, `test_kp_beta.py`,
+  `test_geocode.py`, `test_transit.py`, `test_auth.py`, `test_varga.py`
+  (new, D9 Navamsa), `test_teaser.py` (new, client preview).
 
 ## What this is NOT (yet)
 
@@ -65,7 +89,9 @@ off on the underlying VBA logic or a beta feature is promoted:
 - The client's proprietary **connection-scoring / ranking system**
   (`ConnSummaryCore`, `WTDSCORE`, the `BatchAnalyze_MD_Combinations_*`
   family, `Score_Additive`/`Flag_Additive`).
-- Divisional (varga) charts beyond the basic D1 (Rasi) chart.
+- Divisional (varga) charts beyond D1 (Rasi) and the new beta D9 (Navamsa) —
+  D10 (Dasamsa), D7 (Saptamsa), and the rest of the varga family are not
+  built yet.
 - Dasha/Bhukti/Antra **period selection and timing**.
 - Transit-to-natal **aspects** (trine/square/opposition) beyond simple
   conjunction, and any event-timing/scoring judgment on top of transits —
@@ -167,7 +193,7 @@ pip install -r backend\requirements.txt
 python -m pytest tests\ -v
 ```
 
-Expect `28 passed`.
+Expect `50 passed`.
 
 ## Folder layout
 
@@ -184,30 +210,38 @@ ai_app/
       auth.py                  Supabase JWT verification + subscription gate (off by default)
       billing.py               Stripe webhook -> subscriber table
       engine/
-        ephemeris.py           Swiss Ephemeris wrapper (validated mechanical layer)
-        chart.py               orchestration: request fields -> NatalChart -> dict
+        ephemeris.py           Swiss Ephemeris wrapper (validated mechanical layer) + rasi_house helpers
+        chart.py               orchestration: request fields -> NatalChart -> dict (house + rasi_house)
         kp.py                  BETA: Sub Lord + 4-level house significators
+        varga.py               BETA: D9 Navamsa divisional chart
+        teaser.py              client-facing "candy" preview (template text, not LLM)
         geocode.py             place name -> lat/lon/UTC offset
         transit.py             current/given-moment positions vs natal chart
       agent/
-        chat.py                OpenAI tool-calling chat loop (non-streaming + streaming, 4 tools)
+        chat.py                OpenAI tool-calling chat loop (non-streaming + streaming, 5 tools)
   frontend/
-    index.html                 menu-driven UI: Chart (with wheel) / Transit / KP (beta) / Chat
+    index.html                 menu-driven UI: Preview / Chart (D1+BhavaChalit+D9 wheels) / Transit / KP (beta) / Chat
   tests/
     test_ephemeris.py
     test_kp_beta.py
     test_geocode.py
     test_transit.py
     test_auth.py
+    test_varga.py
+    test_teaser.py
 ```
 
 ## How this maps to the roadmap
 
 This covers **Phase 1** (mechanical layer, validated) and **Phase 2**
-(backend API + frontend — now menu-driven with a chart wheel, transit, and
-geocoding, plus a first labeled-beta pass at KP significators) from
-`ai-agent-app-roadmap.md`. Auth/billing scaffolding is early groundwork for
-**Phase 4**. Next steps from there:
+(backend API + frontend — now menu-driven with three chart-wheel reference
+views, transit, geocoding, a free client-facing preview, and a first
+labeled-beta pass at KP significators and D9 Navamsa) from
+`ai-agent-app-roadmap.md`. The app is also now **live** at
+`orbinovastro.com/ai` via a Codex Sites frontend calling this backend
+(deployed on Render at `https://orbinovastro-ai.onrender.com`) — see
+`CODEX_SITES_INTEGRATION.md` for the integration spec. Auth/billing
+scaffolding is early groundwork for **Phase 4**. Next steps from there:
 
 1. Get the client's read on the KP-beta output, and on which specific
    "transit and other tables" from the workbook matter most for the next

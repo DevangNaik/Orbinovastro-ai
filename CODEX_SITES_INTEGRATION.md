@@ -5,6 +5,18 @@ build. It describes an existing, already-built, already-tested backend — Codex
 job is to build a **frontend page that calls it**, not to reimplement any of the
 astrology math itself.
 
+> **Update (2026-09-25): this is an incremental change to the already-live page,
+> not a from-scratch rebuild.** The site at `orbinovastro.com/ai` is already
+> connected to `BASE_URL` and working (Birth Details form, Chart, Transit, KP
+> Significators beta) — keep that working exactly as-is. This update **adds**:
+> a new **Preview** section (a free, shareable "candy" teaser that ends with a
+> "Book Your Full Reading" button, meant to be the entry point for new
+> visitors) and expands the **Chart** view into three linked reference charts
+> — **D1 (Rasi)**, **Bhava Chalit**, and **D9 (Navamsa, beta)** — all
+> explicitly labeled **Nirayana** (sidereal), since that's the system this
+> engine uses throughout. See "What to build" below for the specifics and the
+> new `/api/navamsa` and `/api/teaser` sections in the API contract.
+
 ## Why this shape (read this before building)
 
 The astrology calculations (Swiss Ephemeris positions, KP Sub Lords, house
@@ -25,34 +37,71 @@ tested (28 automated tests), and running; it just needs its own normal hosting
    The backend already holds its own OpenAI key server-side. This page only
    ever calls the backend's public HTTP endpoints — no keys needed here at all.
 3. **Preserve every disclaimer.** `/api/chart` and `/api/transit` return a
-   `disclaimer` field; `/api/kp-beta` returns `beta_disclaimer`. Display these
-   near the results, don't drop them. The KP Significators feature must always
-   be visibly labeled "beta" — it is standard KP theory, not the client's own
-   validated production scoring.
-4. **`BASE_URL`** below is a placeholder — replace it with the real backend
-   URL once it's deployed (e.g. `https://orbinovastro-ai.onrender.com`).
+   `disclaimer` field; `/api/kp-beta` and `/api/navamsa` return
+   `beta_disclaimer`; `/api/teaser` returns its own `disclaimer`. Display these
+   near the results, don't drop them. The KP Significators and D9 Navamsa
+   features must always be visibly labeled "beta" — they're standard textbook
+   theory, not the client's own validated production scoring.
+4. **`BASE_URL`** is now live: **`https://orbinovastro-ai.onrender.com`**
+   (deployed 2026-09-23 on Render). Use this exact URL everywhere `BASE_URL`
+   appears below.
+5. **`house` vs. `rasi_house` on `/api/chart` planets are both correct, by two
+   different conventions — never treat one as a bug because it disagrees with
+   the other.** `house` is Bhava Chalit (which Placidus cusp segment the
+   planet's exact degree falls into — the KP convention). `rasi_house` is
+   classical D1/Rasi whole-sign house (counted by sign distance from the
+   ascendant's own sign). When you build the three-chart reference view below,
+   the D1/Rasi chart must use `rasi_house`, and the Bhava Chalit chart must use
+   `house` — don't use the same field for both.
+6. **`/api/teaser` must never be placed behind any sign-in/paywall gate**, even
+   after auth is switched on for the other endpoints — its entire purpose is
+   to be usable by visitors who haven't signed up yet. It's the "candy" that
+   should convert into a booking, so keep its call-to-action button (linking
+   to `book_url` from the response) prominent and always visible.
 
 ## What to build
 
-Four features, mirroring what the existing standalone version already does
-(you're welcome to ask to see it — it's a single-page app with a shared
-"Birth Details" panel and Chart / Transit / KP Significators / Chat tabs):
+Mirroring what the existing standalone version already does (you're welcome
+to ask to see it — it's a single-page app with a shared "Birth Details" panel
+and Preview / Chart / Transit / KP Significators / Chat tabs):
 
 1. A **Birth Details** form: name, date (year/month/day), time (hour/minute),
    UTC offset, latitude/longitude, and a place-name field with a "Look up"
    button that calls `/api/geocode` to fill in lat/long/UTC offset
-   automatically.
-2. A **Chart** view: calls `/api/chart`, shows the ascendant, a table of
-   planets (sign, degree, nakshatra, pada, house), and the disclaimer. (A
-   North Indian chart-wheel diagram is a nice-to-have if you want to match the
-   visual richness of the standalone version — not required for a first cut.)
-3. A **Transit** view: an optional date/time picker (blank = right now), calls
+   automatically. (Already live — keep as-is.)
+2. A **Preview** view (new — the client-facing "candy"): calls `/api/teaser`
+   with just the birth details (no sign-in required), shows the `headline`
+   and `blurb` text, and a prominent **"Book Your Full Reading"** button
+   linking to the response's `book_url`. This should be the most inviting,
+   least cluttered view on the page — ideally the first tab a new visitor
+   lands on — since its whole job is to turn a curious visitor into a
+   booking. Show the `disclaimer` in small print, but don't let it compete
+   visually with the headline/blurb/button.
+3. A **Chart** view, expanded into **three linked reference charts** sharing
+   one set of planet data from a single `/api/chart` call plus one
+   `/api/navamsa` call:
+   - **D1 (Rasi)** — classical whole-sign chart. House placement uses each
+     planet's **`rasi_house`** field from `/api/chart`.
+   - **Bhava Chalit** — cuspal (Placidus) house chart. House placement uses
+     each planet's **`house`** field from `/api/chart` (same data source as
+     D1, different field — do not recompute anything).
+   - **D9 (Navamsa, beta)** — calls `/api/navamsa` separately. Show its
+     `beta_disclaimer` prominently; label the tab/section "D9 (beta)" so
+     it's visually distinct from the two validated D1/Bhava Chalit views.
+   All three should be explicitly labeled **Nirayana (sidereal)** somewhere
+   visible on the view — a one-line note near the disclaimer is enough (this
+   engine only ever computes sidereal positions; the label just makes that
+   explicit for anyone comparing against a Western/tropical chart elsewhere).
+   Simple tables are fine for a first cut; a North Indian chart-wheel diagram
+   per view is a nice-to-have, not required.
+4. A **Transit** view: an optional date/time picker (blank = right now), calls
    `/api/transit`, shows each planet's current sign/nakshatra, which natal
-   house it's transiting, and any conjunctions with natal planets.
-4. A **KP Significators (beta)** view: calls `/api/kp-beta`, shows each
+   house it's transiting, and any conjunctions with natal planets. (Already
+   live — keep as-is.)
+5. A **KP Significators (beta)** view: calls `/api/kp-beta`, shows each
    planet's Sub Lord and the 4-level house significators, with the beta
-   disclaimer prominently shown.
-5. Optionally, a **Chat** view: streams from `/api/chat/stream` (Server-Sent
+   disclaimer prominently shown. (Already live — keep as-is.)
+6. Optionally, a **Chat** view: streams from `/api/chat/stream` (Server-Sent
    Events) for a conversational interface — this is more involved to build
    than the others; skip it for a first cut if you want to ship faster.
 
@@ -111,13 +160,64 @@ Response (`ChartOut`):
       "code": "Su", "name": "Sun", "longitude": 175.5,
       "sign": "Virgo", "sign_lord": "Me", "degree_in_sign": 25.5,
       "nakshatra": "Chitra", "nakshatra_lord": "Ma", "pada": 1,
-      "retrograde": false, "house": 8
+      "retrograde": false, "house": 8, "rasi_house": 9
     },
     "... 9 planets total: Su, Mo, Ma, Me, Ju, Ve, Sa, Ra, Ke"
   ],
   "disclaimer": "Mechanical-layer chart only: ... (show this to the user)"
 }
 ```
+`house` is Bhava Chalit (cuspal/Placidus) house placement. `rasi_house` is
+classical D1/Rasi whole-sign house placement. They can legitimately differ
+for a planet near a house cusp — see rule 5 above. Use `house` for the Bhava
+Chalit view and `rasi_house` for the D1 view.
+
+### `POST /api/navamsa` (BETA)
+D9 Navamsa divisional chart — standard textbook formula (movable/fixed/dual
+sign rule), not yet matched against the client's own workbook, hence "beta".
+
+Request: same `BirthDetailsIn` shape as `/api/chart`.
+
+Response (`NavamsaOut`):
+```json
+{
+  "ascendant_navamsa_sign": "Leo", "ascendant_navamsa_sign_lord": "Su",
+  "planets": [
+    {
+      "code": "Su", "name": "Sun",
+      "navamsa_sign": "Scorpio", "navamsa_sign_lord": "Ma",
+      "navamsa_house": 4
+    },
+    "... 9 planets total: Su, Mo, Ma, Me, Ju, Ve, Sa, Ra, Ke"
+  ],
+  "beta_disclaimer": "BETA: standard D9 Navamsa formula only. ... (show this prominently)"
+}
+```
+`navamsa_house` is whole-sign house placement counted from
+`ascendant_navamsa_sign` (Placidus cusps aren't recomputed for divisional
+charts — that's not how D-charts work).
+
+### `POST /api/teaser`
+The free, client-facing "candy" preview — deliberately not gated behind
+sign-in, even once auth is turned on elsewhere. No predictions, no
+significators — just ascendant + Moon sign framing and a booking link.
+
+Request: same `BirthDetailsIn` shape as `/api/chart` (only `name` and the
+birth/location fields are used; `place` is ignored here).
+
+Response (`TeaserOut`):
+```json
+{
+  "ascendant_sign": "Capricorn", "moon_sign": "Pisces",
+  "headline": "Devang rises in Capricorn, Moon in Pisces.",
+  "blurb": "A Capricorn ascendant carries quiet discipline -- composed, ambitious, patient in the way it builds. Paired with a Moon that dissolves easily into feeling -- an emotional world that is porous, dreamy, compassionate.",
+  "book_url": "https://orbinovastro.square.site/s/appointments",
+  "disclaimer": "General sign-level preview, not a personalized reading -- book a full consultation for chart-specific guidance."
+}
+```
+Render `headline` and `blurb` as the main content, with a prominent button
+labeled something like **"Book Your Full Reading"** that links to `book_url`
+(opens in a new tab). Show `disclaimer` in small print near the bottom.
 
 ### `POST /api/kp-beta`
 Request: same `BirthDetailsIn` shape as `/api/chart`.
@@ -223,11 +323,17 @@ something Codex needs to handle.
 
 1. `GET {BASE_URL}/health` returns `{"status": "ok"}`.
 2. Fill in a known birth detail (or use "Look up" with a place name) and
-   compute the chart — check the ascendant sign and a planet or two make
-   sense (e.g. cross-check against a known reference chart).
-3. Compute KP significators for the same birth details — the "beta" label
+   generate the **Preview** — confirm the headline/blurb read sensibly and
+   the "Book Your Full Reading" button opens `book_url` in a new tab.
+3. Compute the chart and check all **three reference views**: D1 shows each
+   planet's `rasi_house`, Bhava Chalit shows each planet's `house` (these can
+   legitimately differ for the same planet — that's expected, not a bug), and
+   D9 (beta) shows `navamsa_sign`/`navamsa_house` with its beta disclaimer
+   visible. Cross-check the ascendant sign and a planet or two against a known
+   reference chart.
+4. Compute KP significators for the same birth details — the "beta" label
    must be visible.
-4. Try the transit view with no date (defaults to now) and with a specific
+5. Try the transit view with no date (defaults to now) and with a specific
    date.
-5. If chat is built: ask "What sign is my Moon in?" and confirm the tool tag
+6. If chat is built: ask "What sign is my Moon in?" and confirm the tool tag
    and streamed answer both appear.

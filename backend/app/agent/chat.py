@@ -7,6 +7,8 @@ never does astrology math itself. It can call four tools:
   - compute_kp_significators_beta: standard KP Sub Lord + significator
     theory, explicitly labeled beta/unvalidated against the client's own
     production scoring (see app/engine/kp.py's module docstring).
+  - compute_navamsa_beta: standard D9 Navamsa divisional chart, explicitly
+    labeled beta (see app/engine/varga.py's module docstring).
   - geocode_place: place name -> real lat/lon/UTC offset (via
     app/engine/geocode.py), so the model never has to guess coordinates.
   - compute_transit: current (or given-moment) planetary positions placed
@@ -27,6 +29,7 @@ from ..engine.ephemeris import BirthMoment
 from ..engine.geocode import GeocodeError, geocode_and_resolve_offset
 from ..engine.kp import compute_kp_beta
 from ..engine.transit import compute_transit, now_as_birth_moment
+from ..engine.varga import compute_navamsa
 from ..models import BirthDetailsIn, ChatMessageIn
 
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
@@ -45,12 +48,19 @@ Scope and honesty rules (do not break these):
   client's proprietary weighted scoring/ranking system. Whenever you use
   it, say plainly that it's a beta feature and results may not match the
   production workbook exactly.
-- This build does NOT include divisional charts beyond D1, dasha/bhukti
+- compute_navamsa_beta is EXPLICITLY BETA too: the standard textbook D9
+  Navamsa formula, not yet cross-checked against this client's workbook.
+  Say so plainly whenever you use it.
+- This build does NOT include divisional charts beyond D1/D9, dasha/bhukti
   period selection/timing, or the client's connection-scoring/ranking
   engine. If asked for predictions, event timing, or a ranked judgment,
   say plainly that isn't included yet, and offer what compute_chart /
-  compute_kp_significators_beta (both clearly labeled) can tell them
-  instead.
+  compute_kp_significators_beta / compute_navamsa_beta (all clearly
+  labeled) can tell them instead.
+- Each planet from compute_chart has two house numbers: "house" (Bhava
+  Chalit, Placidus cusp -- what KP significators use) and "rasi_house"
+  (classical D1 whole-sign house). If asked "which house" without
+  qualification, mention both if they differ for that planet.
 - The ayanamsa used is the standard Krishnamurti (KP) ayanamsa built into
   Swiss Ephemeris -- a stand-in until the client confirms their workbook's
   exact ayanamsa ("Devarajayan"). Mention this if asked why numbers might
@@ -122,6 +132,22 @@ KP_BETA_TOOL = {
     },
 }
 
+NAVAMSA_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "compute_navamsa_beta",
+        "description": (
+            "BETA. Compute the D9 Navamsa divisional chart: each planet's "
+            "Navamsa sign, sign lord, and whole-sign house within the D9 "
+            "chart. Standard textbook formula, NOT yet cross-checked "
+            "against the client's workbook. Always tell the user this is "
+            "beta when you use it. Takes the same birth parameters as "
+            "compute_chart."
+        ),
+        "parameters": CHART_TOOL["function"]["parameters"],
+    },
+}
+
 GEOCODE_TOOL = {
     "type": "function",
     "function": {
@@ -175,7 +201,7 @@ TRANSIT_TOOL = {
     },
 }
 
-TOOLS = [CHART_TOOL, KP_BETA_TOOL, GEOCODE_TOOL, TRANSIT_TOOL]
+TOOLS = [CHART_TOOL, KP_BETA_TOOL, NAVAMSA_TOOL, GEOCODE_TOOL, TRANSIT_TOOL]
 
 
 def _run_chart_tool(args: dict) -> dict:
@@ -196,6 +222,22 @@ def _run_kp_beta_tool(args: dict) -> dict:
         latitude=args["latitude"], longitude=args["longitude"],
     )
     return compute_kp_beta(chart)
+
+
+def _run_navamsa_tool(args: dict) -> dict:
+    chart = build_chart_from_fields(
+        year=args["year"], month=args["month"], day=args["day"],
+        hour=args["hour"], minute=args["minute"], second=args.get("second", 0),
+        utc_offset_hours=args["utc_offset_hours"],
+        latitude=args["latitude"], longitude=args["longitude"],
+    )
+    nav = compute_navamsa(chart)
+    return {
+        "ascendant_navamsa_sign": nav.ascendant_navamsa_sign,
+        "ascendant_navamsa_sign_lord": nav.ascendant_navamsa_sign_lord,
+        "planets": [vars(p) for p in nav.planets],
+        "beta_disclaimer": nav.beta_disclaimer,
+    }
 
 
 def _run_geocode_tool(args: dict) -> dict:
@@ -240,6 +282,8 @@ def _execute_tool(name: str, args: dict) -> dict:
         return _run_chart_tool(args)
     if name == "compute_kp_significators_beta":
         return _run_kp_beta_tool(args)
+    if name == "compute_navamsa_beta":
+        return _run_navamsa_tool(args)
     if name == "geocode_place":
         return _run_geocode_tool(args)
     if name == "compute_transit":

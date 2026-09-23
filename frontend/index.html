@@ -105,6 +105,17 @@
     padding: 5px 12px; cursor: pointer; background: var(--panel2);
   }
   .chip:hover { color: var(--text); border-color: var(--accent-dim); }
+
+  /* ---- reference chart sections + teaser preview ---- */
+  .chart-section { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border); }
+  .chart-section:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+  .system-note-line { color: var(--muted); font-size: 11.5px; margin: 6px 0 16px; }
+  .teaser-card { max-width: 480px; padding: 18px 20px; border-radius: 10px; background: var(--panel2); border: 1px solid var(--border); }
+  .teaser-card h3 { font-size: 16px; margin: 0 0 10px; color: var(--text); }
+  .teaser-card p { font-size: 13.5px; line-height: 1.6; color: var(--muted); margin: 0 0 16px; }
+  .book-btn { display: inline-block; width: auto; margin: 0; padding: 10px 20px; border-radius: 6px;
+    background: var(--accent); color: #1a1508; font-weight: 700; text-decoration: none; font-size: 13.5px; }
+  .book-btn:hover { opacity: 0.9; }
 </style>
 </head>
 <body>
@@ -112,7 +123,7 @@
 <header>
   <div class="title">
     <h1>ORBINOVASTRO — AI App</h1>
-    <p>Swiss Ephemeris chart &amp; transit engine · OpenAI chat · <span style="color:var(--beta)">KP significators (beta)</span></p>
+    <p>Swiss Ephemeris chart &amp; transit engine · D1/Bhava Chalit/<span style="color:var(--beta)">D9 (beta)</span> reference · OpenAI chat · <span style="color:var(--beta)">KP significators (beta)</span></p>
   </div>
   <button id="btn-clear">Clear conversation</button>
 </header>
@@ -147,14 +158,22 @@
 
   <section id="panel-content">
     <nav class="tabs">
-      <button id="nav-chart" data-tab="chart" class="active">Chart</button>
+      <button id="nav-preview" data-tab="preview" class="active">Preview</button>
+      <button id="nav-chart" data-tab="chart">Chart Reference</button>
       <button id="nav-transit" data-tab="transit">Transit</button>
       <button id="nav-kp" data-tab="kp">KP Significators <span style="color:var(--beta)">(beta)</span></button>
       <button id="nav-chat" data-tab="chat">Chat</button>
     </nav>
 
-    <div id="tab-chart" class="tab-panel">
-      <h2>Natal Chart</h2>
+    <div id="tab-preview" class="tab-panel">
+      <h2>Free Preview</h2>
+      <small class="note" style="margin-bottom:10px">A short, shareable preview for a visitor deciding whether to book — not the full reference chart (see the Chart Reference tab for that).</small>
+      <button id="btn-teaser">Get Preview</button>
+      <div id="teaser-result"></div>
+    </div>
+
+    <div id="tab-chart" class="tab-panel" style="display:none">
+      <h2>Chart Reference — D1 · Bhava Chalit · D9 <span style="color:var(--muted);font-weight:400">(Nirayana / sidereal)</span></h2>
       <button id="btn-compute">Compute Chart</button>
       <div id="chart-result"></div>
     </div>
@@ -265,9 +284,9 @@ function currentBirthDetails() {
 }
 
 // ---------- tab navigation ----------
-const TABS = ["chart", "transit", "kp", "chat"];
+const TABS = ["preview", "chart", "transit", "kp", "chat"];
 function showTab(name) {
-  if (!TABS.includes(name)) name = "chart";
+  if (!TABS.includes(name)) name = "preview";
   for (const t of TABS) {
     const panel = document.getElementById("tab-" + t);
     const navBtn = document.getElementById("nav-" + t);
@@ -305,6 +324,25 @@ const NI_HOUSES = {
 
 function signAbbrev(sign) { return (sign || "").slice(0, 3); }
 
+const RASHI_NAMES_JS = [
+  "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+  "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+];
+
+// Whole-sign houses 1-12, starting from whichever sign occupies house 1
+// (e.g. the D1 ascendant's sign, or the D9 ascendant's Navamsa sign) --
+// used to label a wheel's 12 boxes for D1/D9 (sign-based) diagrams, as
+// opposed to the Bhava Chalit wheel which uses the API's own cuspal
+// `houses` list directly.
+function wholeSignHouseList(house1Sign) {
+  const startIdx = RASHI_NAMES_JS.indexOf(house1Sign);
+  const houses = [];
+  for (let h = 1; h <= 12; h++) {
+    houses.push({ house: h, sign: RASHI_NAMES_JS[(startIdx + h - 1 + 12) % 12] });
+  }
+  return houses;
+}
+
 function northIndianChartSVG(data) {
   const houseSign = {};
   for (const h of data.houses) houseSign[h.house] = h.sign;
@@ -335,18 +373,63 @@ function northIndianChartSVG(data) {
   return svg;
 }
 
-// ---------- Chart tab ----------
-function renderChart(data) {
-  const el = document.getElementById("chart-result");
-  let html = `<div id="ni-chart-wrap" class="ni-chart-wrap">${northIndianChartSVG(data)}</div>`;
+// ---------- Chart tab: D1 (Rasi) + Bhava Chalit + D9 (Navamsa, beta), all Nirayana (sidereal) ----------
+function renderD1Rasi(data) {
+  const wheelData = {
+    houses: wholeSignHouseList(data.ascendant.sign),
+    planets: data.planets.map(p => ({ ...p, house: p.rasi_house })),
+  };
+  let html = `<h3>D1 — Rasi Chart (whole-sign houses)</h3>`;
+  html += `<div id="ni-chart-wrap" class="ni-chart-wrap">${northIndianChartSVG(wheelData)}</div>`;
   html += `<div><strong>Ascendant:</strong> ${data.ascendant.sign} (lord ${data.ascendant.sign_lord}), ${data.ascendant.longitude.toFixed(2)}°</div>`;
-  html += `<div style="margin-top:4px;color:var(--muted)">Ayanamsa: ${data.ayanamsa_mode}, ${data.ayanamsa_deg.toFixed(3)}°</div>`;
-  html += "<table><tr><th>Planet</th><th>Sign</th><th>Deg</th><th>Nakshatra</th><th>Pada</th><th>House</th></tr>";
+  html += "<table><tr><th>Planet</th><th>Sign</th><th>Deg</th><th>Nakshatra</th><th>Pada</th><th>House (D1)</th></tr>";
   for (const p of data.planets) {
-    html += `<tr><td>${p.name}${p.retrograde ? " (R)" : ""}</td><td>${p.sign}</td><td>${p.degree_in_sign.toFixed(2)}</td><td>${p.nakshatra}</td><td>${p.pada}</td><td>${p.house}</td></tr>`;
+    html += `<tr><td>${p.name}${p.retrograde ? " (R)" : ""}</td><td>${p.sign}</td><td>${p.degree_in_sign.toFixed(2)}</td><td>${p.nakshatra}</td><td>${p.pada}</td><td>${p.rasi_house}</td></tr>`;
   }
   html += "</table>";
-  html += `<div class="disclaimer">${data.disclaimer}</div>`;
+  return html;
+}
+
+function renderBhavaChalit(data) {
+  let html = `<h3>Bhava Chalit (Placidus cuspal houses — what KP practice uses)</h3>`;
+  html += `<div id="ni-chart-wrap-bc" class="ni-chart-wrap">${northIndianChartSVG(data)}</div>`;
+  html += "<table><tr><th>House</th><th>Cusp Sign</th><th>Cusp Longitude</th></tr>";
+  for (const h of data.houses) {
+    html += `<tr><td>${h.house}</td><td>${h.sign}</td><td>${h.longitude.toFixed(2)}°</td></tr>`;
+  }
+  html += "</table>";
+  html += "<table style='margin-top:8px'><tr><th>Planet</th><th>Bhava House</th></tr>";
+  for (const p of data.planets) {
+    html += `<tr><td>${p.name}${p.retrograde ? " (R)" : ""}</td><td>${p.house}</td></tr>`;
+  }
+  html += "</table>";
+  return html;
+}
+
+function renderD9Navamsa(nav) {
+  const wheelData = {
+    houses: wholeSignHouseList(nav.ascendant_navamsa_sign),
+    planets: nav.planets.map(p => ({ code: p.code, house: p.navamsa_house, retrograde: false })),
+  };
+  let html = `<h3>D9 — Navamsa <span class="tool-tag">Beta</span></h3>`;
+  html += `<div id="ni-chart-wrap-d9" class="ni-chart-wrap">${northIndianChartSVG(wheelData)}</div>`;
+  html += `<div><strong>D9 Ascendant:</strong> ${nav.ascendant_navamsa_sign} (lord ${nav.ascendant_navamsa_sign_lord})</div>`;
+  html += "<table><tr><th>Planet</th><th>Navamsa Sign</th><th>Navamsa Lord</th><th>House (D9)</th></tr>";
+  for (const p of nav.planets) {
+    html += `<tr><td>${p.name}</td><td>${p.navamsa_sign}</td><td>${p.navamsa_sign_lord}</td><td>${p.navamsa_house}</td></tr>`;
+  }
+  html += "</table>";
+  html += `<div class="disclaimer">${nav.beta_disclaimer}</div>`;
+  return html;
+}
+
+function renderChart(data, nav, navError) {
+  const el = document.getElementById("chart-result");
+  let html = `<div class="system-note-line">System: <strong>Nirayana</strong> (sidereal) · Ayanamsa: ${data.ayanamsa_mode}, ${data.ayanamsa_deg.toFixed(3)}°</div>`;
+  html += `<div class="chart-section">${renderD1Rasi(data)}</div>`;
+  html += `<div class="chart-section">${renderBhavaChalit(data)}</div>`;
+  html += `<div class="chart-section">${nav ? renderD9Navamsa(nav) : `<div class="error-box">D9 Navamsa: ${navError || "not available"}</div>`}</div>`;
+  html += `<div class="chart-section"><div class="disclaimer">${data.disclaimer}</div></div>`;
   el.innerHTML = html;
 }
 
@@ -355,18 +438,48 @@ async function computeChart() {
   btn.disabled = true; btn.textContent = "Computing...";
   try {
     const body = currentBirthDetails();
-    const res = await fetch("/api/chart", {
-      method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
-    const data = await res.json();
+    const [chartRes, navRes] = await Promise.all([
+      fetch("/api/chart", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) }),
+      fetch("/api/navamsa", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) }),
+    ]);
+    if (!chartRes.ok) throw new Error((await chartRes.json()).detail || chartRes.statusText);
+    const data = await chartRes.json();
+    let nav = null, navError = null;
+    if (navRes.ok) { nav = await navRes.json(); }
+    else { navError = (await navRes.json()).detail || navRes.statusText; }
     lastBirthDetails = body;
-    renderChart(data);
+    renderChart(data, nav, navError);
     saveState();
   } catch (e) {
     document.getElementById("chart-result").innerHTML = `<div class="error-box">Error: ${e.message}</div>`;
   } finally {
     btn.disabled = false; btn.textContent = "Compute Chart";
+  }
+}
+
+// ---------- Preview tab (free client-facing teaser) ----------
+async function computeTeaser() {
+  const btn = document.getElementById("btn-teaser");
+  btn.disabled = true; btn.textContent = "Computing...";
+  const el = document.getElementById("teaser-result");
+  try {
+    const body = currentBirthDetails();
+    const res = await fetch("/api/teaser", {
+      method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    const data = await res.json();
+    el.innerHTML = `
+      <div class="teaser-card">
+        <h3>${escapeHtml(data.headline)}</h3>
+        <p>${escapeHtml(data.blurb)}</p>
+        <a class="book-btn" href="${data.book_url}" target="_blank" rel="noopener">Book Your Full Reading ↗</a>
+      </div>
+      <div class="disclaimer" style="max-width:480px">${data.disclaimer}</div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="error-box">Error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = "Get Preview";
   }
 }
 
@@ -587,6 +700,7 @@ async function sendChat(presetText) {
 }
 
 document.getElementById("btn-compute").addEventListener("click", computeChart);
+document.getElementById("btn-teaser").addEventListener("click", computeTeaser);
 document.getElementById("btn-geocode").addEventListener("click", doGeocode);
 document.getElementById("btn-transit").addEventListener("click", computeTransit);
 document.getElementById("btn-kp").addEventListener("click", computeKP);
@@ -601,8 +715,8 @@ document.querySelectorAll("nav.tabs button").forEach(b => {
 });
 
 loadState();
-let initialTab = "chart";
-try { initialTab = localStorage.getItem(STORAGE_KEY + "_tab") || "chart"; } catch (e) {}
+let initialTab = "preview";
+try { initialTab = localStorage.getItem(STORAGE_KEY + "_tab") || "preview"; } catch (e) {}
 showTab(initialTab);
 </script>
 </body>
