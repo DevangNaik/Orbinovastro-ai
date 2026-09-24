@@ -737,6 +737,46 @@ NOT to drop just because this particular example doesn't show them:
 
 ## Planet color scheme and the enriched Planet Details Table (updated, 2026-09-24 later still)
 
+**UPDATE (2026-09-24, final on this point) -- the "Nature" badge decision.**
+Client's own real Excel "Nature" column was cross-checked against both
+fields this engine computes: it matches `functional_nature` exactly for
+all 7 classical rasi-ruling planets (Su/Mo/Ma/Me/Ju/Ve/Sa), not the fixed
+`nature` field (which disagrees on Sun/Jupiter/Saturn). The client's own
+decision on how to render this, verbatim: *"make functional_nature the
+primary badge labeled 'Functional Nature', since it matches the Excel
+chart. Show fixed nature as a smaller, separately labeled 'Natural
+Nature' note. Don't label either one simply 'Nature'; that hides the
+distinction."* This **replaces every earlier instruction in this doc**
+that said to render a single bare "Nature" badge, or that showed
+`functional_nature` as a secondary "Functional: X" tag next to an
+unlabeled primary "Nature" badge (see the "SUPERSEDED" notes below where
+this applied) -- the rule from here on:
+
+- **Primary badge, labeled "Functional Nature"** -- from the
+  `functional_nature` field (`"Malefic"` / `"Benefic"` / `null` → shown
+  as a dash for Rahu, Ketu, Uranus, Neptune, Pluto, and the Ascendant).
+- **Smaller, separately labeled note, "Natural Nature"** -- from the
+  fixed `nature` field (`"Malefic"` / `"Benefic"`, or a dash for the
+  Ascendant which has no `nature` key at all, and for Uranus/Neptune/
+  Pluto whose `nature` is `""`).
+- **Neither is ever labeled just "Nature" alone** -- always the full
+  "Functional Nature" / "Natural Nature" label, everywhere this appears
+  (the Planet Details Table's third line, any tooltip, any legend).
+- **Rahu and Ketu: show exactly what the API returns, with these same
+  explicit labels** -- `Functional Nature: —` (it's `null` for both --
+  no textbook rule the client's own data confirms exists yet for the
+  lunar nodes) and `Natural Nature: Malefic` for both. **Do NOT implement
+  any node-specific functional-nature rule** (a "takes the nature of a
+  close conjunct planet, else its sign's dispositor" hypothesis was
+  floated and fits this one reference chart, but the client explicitly
+  asked to hold off implementing it until it can be checked against more
+  real charts -- so Rahu/Ketu's Excel-vs-engine mismatch stays
+  **openly flagged, not silently patched or guessed at**.)
+
+This is a labeling/priority change only -- both fields were already
+correctly computed and returned by `/api/chart` before this UPDATE box;
+nothing on the backend changes here.
+
 **UPDATE (2026-09-24, latest):** client feedback on the live "Conj. /
 Aspects" cell -- the three stacked lines (`Conj:` / `Aspects:` /
 `Aspected by:`) currently always render, showing `"Conj: —"` etc. as
@@ -786,13 +826,15 @@ server-side already, nothing structural for Codex to redesign:
 2. **New field: `functional_nature`.** A SEPARATE Benefic/Malefic
    classification from `nature` -- chart-specific (depends on which
    houses a planet rules from the CURRENT ascendant, not a fixed
-   per-planet fact), labeled BETA. Render it as a second small badge next
-   to the existing Nature badge on the fourth line of the "Planet /
-   Position" cell, e.g. `Malefic · Functional: Benefic · Retrograde` --
-   don't merge the two into one badge, since they can (and for this
-   engagement's own reference chart, do) disagree for the same planet.
-   `null` for Rahu/Ketu and for Uranus/Neptune/Pluto (see point 3) --
-   dash, not a missing badge.
+   per-planet fact), labeled BETA. ~~Render it as a second small badge
+   next to the existing Nature badge... e.g. `Malefic · Functional:
+   Benefic · Retrograde`~~ **SUPERSEDED -- see the "UPDATE (2026-09-24,
+   final on this point)" box at the top of this section: `functional_nature`
+   is now the PRIMARY badge, labeled "Functional Nature"; `nature` is the
+   smaller secondary note, labeled "Natural Nature" -- neither is ever
+   labeled bare "Nature".** `null` for Rahu/Ketu and for Uranus/Neptune/
+   Pluto (see point 3) -- shown as `Functional Nature: —`, not a missing
+   badge.
 3. **Uranus, Neptune, and Pluto now appear as three more rows.** The
    earlier guidance below saying not to add them is superseded -- ignore
    point 6 and the color-scheme note about them further down, both left
@@ -817,23 +859,85 @@ match:
    into the first cell as before:
    - **"Planet / Position"** -- ~~stack these four lines vertically in one
      cell~~ **SUPERSEDED (2026-09-24, newest -- client asked to compact
-     this cell): exactly THREE tightly-spaced lines, not four** --
-     merge the planet name onto the same line as sign/house:
-     1. `{code} {full name} · {sign} · House {N}` -- e.g. `Ma Mars ·
-        Aries · House 4`. The sign/house part is **for the currently
-        selected chart view** (see point 7 below for exactly which field
-        feeds which tab) -- it's the one part of this line that changes
-        between the D1/Bhava Chalit/D9/Cuspal tabs; the planet name part
-        never changes.
+     this cell, then refined it once more to drop the redundant 2-letter
+     code): exactly THREE tightly-spaced lines, not four**:
+     1. ~~`{code} {full name} · {sign} · House {N}` -- e.g. `Ma Mars ·
+        Aries · House 4`~~ **SUPERSEDED again (2026-09-24, newest still)
+        -- client caught that `{code} {full name}` reads as a duplicate
+        (e.g. "Ma Mars", "Su Sun") since the code is just short for the
+        name right next to it.** Replace the 2-letter code with a small
+        decorative icon instead: `{icon} {full name} · {sign} · House
+        {N}` -- e.g. `[Mars icon] Mars · Aries · House 4`.
+        ~~Use these standard astrological glyphs (☉ ☽ ♂ ☿ ♃ ♀ ♄ ☊ ☋ ⛢ ♆
+        ♇, ↑ for the Ascendant)~~ **SUPERSEDED once more (2026-09-24,
+        newest still again) -- client asked for real, high-quality
+        images of the actual planets, not text glyphs**, per body:
+        - **Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus,
+          Neptune, Pluto (10 real bodies):** a small circular icon
+          cropped from a real, high-quality, public-domain astronomical
+          photo of that body -- source from NASA's own official
+          galleries (e.g. NASA Science's planet pages at
+          science.nasa.gov, NASA's Solar System Exploration site at
+          solarsystem.nasa.gov/planets, or the NASA Image and Video
+          Library at images.nasa.gov -- all NASA-produced imagery is
+          U.S. government work and public domain). **Download and
+          self-host a cropped copy in the site's own image assets rather
+          than hotlinking directly to a NASA URL** -- this keeps the
+          icon's crop/framing/size consistent and doesn't depend on an
+          external host staying up. Crop each to a centered circle on
+          the planet's disc (not a mission spacecraft or a wide starfield
+          shot), export at a size sharp on retina displays at the actual
+          small display size the row uses (e.g. store 128px, display
+          ~24-32px), and keep consistent brightness/contrast across the
+          whole set so darker images (Uranus, Neptune) don't read as
+          washed-out or unrecognizable next to brighter ones (Sun,
+          Venus).
+        - **Rahu and Ketu are not physical bodies** -- they're the
+          Moon's ascending/descending orbital nodes, mathematical points
+          with no surface, atmosphere, or photograph to source. Per the
+          client's own confirmation, use their standard Hindu/Vedic
+          iconographic depiction instead: a small, clean illustration of
+          a **snake head** for Rahu and a **snake tail** for Ketu --
+          distinct from each other and from any of the 10 real-body
+          icons, and NOT a photograph (there's nothing physical to
+          photograph).
+        - **The Ascendant isn't a planet either** -- per the client's
+          confirmation, use a simple rising-arrow icon (`↑` or an
+          equivalent small arrow illustration), matching the wheel
+          diagram's own existing "ASC ↑" marker.
+        - **Visual consistency across all 13 icons:** give the Rahu/Ketu
+          symbolic icons and the Ascendant's arrow icon the same circular
+          frame/size/subtle-background treatment as the 10 photographic
+          icons, so the row of icons reads as one consistent set rather
+          than photos next to a completely different, ungrounded icon
+          style for 3 of the 13 rows.
+        Icons are decorative only -- the full name right next to it
+        (`Mars`, not `Ma`) is the actual readable identifier, so nothing
+        depends on the icon rendering correctly (e.g. a broken image) for
+        the row to still make sense; use `alt="Mars"` (etc.) on each
+        image for accessibility and as a fallback if it fails to load.
      2. `{DegreeInSign}° · {Nakshatra}({Pada})` -- e.g. `12.23° ·
         Ashwini(4)`. **Nakshatra(Pada) appears ONLY on this line** --
         don't repeat it anywhere else in this cell (the Meaning column's
         own sentence, in the separate "Meaning" cell, still leads with
         it as before -- that's a different column and stays unchanged).
-     3. Nature and flags together, e.g. `Malefic · R* · Own Sign` --
-        same compact flag codes and dash conventions as already
-        specified (point 3 below and point 5's Ascendant-specific
-        gaps), styled as small colored badges/pills, not plain text.
+     3. ~~Nature and flags together, e.g. `Malefic · R* · Own Sign`~~
+        **SUPERSEDED (2026-09-24, final on this point) -- see the UPDATE
+        box at the top of this section for the full "Functional Nature"
+        vs. "Natural Nature" labeling decision.** This line now shows
+        THREE things, each explicitly labeled: `Functional Nature: {X}`
+        (primary/larger badge) · `Natural Nature: {Y}` (smaller,
+        separate note) · flag badges -- e.g. `Functional Nature: Malefic
+        · Natural Nature: Benefic · D↓` for Jupiter, or for Rahu:
+        `Functional Nature: — · Natural Nature: Malefic · R*`. Neither
+        nature value is ever labeled bare "Nature" on its own. Same
+        compact flag codes and dash conventions as already specified
+        (point 3 below and point 5's Ascendant-specific gaps), all
+        styled as small colored badges/pills, not plain text. If the
+        line gets visually crowded with all three, wrapping to a second
+        sub-line within this same line-3 slot is fine -- the cell's
+        overall 3-line count (this counts as one of the three) and
+        tightened spacing from the change above still apply.
      Applies to the Ascendant row too, with its own existing dash
      conventions for Nature (it has none) unchanged.
      **Spacing (2026-09-24, newest):** reduce this cell's vertical
@@ -843,12 +947,13 @@ match:
      cell, per the omit-when-empty rule above) to 3-4px. Do **not** set
      a fixed row height or truncate/abbreviate the Meaning sentence --
      let it wrap normally, and let each row be only as tall as its
-     tallest cell actually needs. Keep the existing three-column layout,
-     colors, badges, dividers, and mobile behavior (cells still stack on
-     a phone) -- this is a spacing/line-count change only, not a
-     redesign. Verify Mars's three lines stay readable and that rows
-     with short Meaning sentences no longer carry extra empty vertical
-     space.
+     tallest cell actually needs, and don't let the icon or tightened
+     spacing clip any text on mobile. Keep the existing three-column
+     layout, colors, badges, dividers, and mobile behavior (cells still
+     stack on a phone) otherwise unchanged -- this is a spacing/
+     line-count/icon change only, not a redesign. Verify Mars's three
+     lines stay readable and that rows with short Meaning sentences no
+     longer carry extra empty vertical space.
    - **"Conj. / Aspects"** (new, replacing the old "Details" cell's first
      half) -- stack three lines:
      1. **Conjunctions** -- other planets sharing this one's D1 sign, e.g.
@@ -1006,20 +1111,19 @@ down for the full shape):
   like normal) but no `aspects` key at all — it never casts one, so
   that line is always omitted for the Ascendant, not dashed.
 - `nature` — `"Malefic"` or `"Benefic"`, or an empty string for Uranus/
-  Neptune/Pluto (dash). Renders on the fourth line of the "Planet /
-  Position" cell, alongside flags (see the UPDATE box's point 1 above).
-  Not present on the Ascendant entry either, for the same reason as
-  `conjunctions` — use a dash there. Tint it consistently with the Flags
-  badges (see the existing "Retrograde and beta markers should be
-  visually distinct" guidance below).
-- `functional_nature` — **new**, `"Malefic"` / `"Benefic"` / `null`. A
-  SEPARATE, chart-specific classification from `nature` (see the UPDATE
-  box at the top of this section) -- based on which houses this planet
-  RULES from the current ascendant, not a fixed per-planet fact, so it
-  can (and does, for real charts) disagree with `nature`. `null` for
-  Rahu/Ketu and for Uranus/Neptune/Pluto — dash. Render as its own small
-  badge right next to the Nature badge, labeled distinctly (e.g.
-  "Functional: Benefic"), never merged into one badge with `nature`.
+  Neptune/Pluto (dash). Not present on the Ascendant entry either — use a
+  dash there. **Render as the smaller, secondary "Natural Nature" note
+  (see the "UPDATE (2026-09-24, final on this point)" box at the top of
+  this section) — never labeled bare "Nature".**
+- `functional_nature` — `"Malefic"` / `"Benefic"` / `null`. A SEPARATE,
+  chart-specific classification from `nature` -- based on which houses
+  this planet RULES from the current ascendant, not a fixed per-planet
+  fact, so it can (and does, for real charts) disagree with `nature`.
+  `null` for Rahu/Ketu and for Uranus/Neptune/Pluto — dash. **This is now
+  the PRIMARY badge, labeled "Functional Nature"** (see the "UPDATE
+  (2026-09-24, final on this point)" box at the top of this section —
+  it matches the client's real Excel Nature column exactly for the 7
+  classical rasi-ruling planets, which `nature` alone does not).
 - `planet_element` / `rashi_element` — **new**, both `"Fire"`/`"Water"`/
   `"Earth"`/`"Air"`/(`planet_element` only) `"Ether"`. `planet_element` is
   the planet's own FIXED classical element (Su/Ma=Fire, Mo/Ve=Water,
