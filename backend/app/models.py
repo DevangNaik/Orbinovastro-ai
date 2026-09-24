@@ -175,3 +175,56 @@ class ChatRequestIn(BaseModel):
 class ChatResponseOut(BaseModel):
     reply: str
     used_chart_tool: bool = False
+
+
+class CcsiTransitDetailsIn(BaseModel):
+    year: int | None = None
+    month: int | None = Field(None, ge=1, le=12)
+    day: int | None = Field(None, ge=1, le=31)
+    hour: int | None = Field(None, ge=0, le=23)
+    minute: int | None = Field(None, ge=0, le=59)
+    utc_offset_hours: float = 0.0
+    latitude: float | None = Field(
+        None,
+        description=(
+            "Location the transit cusps are computed for. Omitted = same "
+            "location as the natal birth details -- the client's own "
+            "convention for which location their 'current' transit "
+            "snapshot uses is still unconfirmed (see the project roadmap "
+            "doc), so this is a documented assumption, not a confirmed one."
+        ),
+    )
+    longitude: float | None = None
+
+
+class CcsiRequestIn(BaseModel):
+    birth: BirthDetailsIn
+    transit: CcsiTransitDetailsIn | None = None  # None/omitted = right now, at the birth location
+
+
+class CcsiRowOut(BaseModel):
+    houses: dict[str, float] = Field(description='House number "1".."12" -> hit count')
+    columns: dict[str, float] = Field(description='"Asc","Su",...,"Ke" -> hit count')
+
+
+class CcsiOut(BaseModel):
+    l_net: CcsiRowOut = Field(description="Natal Lagna: natal cusps/planets vs. natal planets")
+    l_negative: CcsiRowOut
+    lt_net: CcsiRowOut = Field(description="Transit-to-Lagna: natal cusps/planets vs. transiting planets")
+    lt_negative: CcsiRowOut
+    tt_net: CcsiRowOut = Field(description="Transit-to-Transit: transit cusps/planets vs. transiting planets")
+    tt_negative: CcsiRowOut
+    transit_time_utc: str
+    transit_time_source: str
+    disclaimer: str
+
+
+class OverviewReportRequestIn(BaseModel):
+    """POST /api/overview-report. Same birth/transit shape as CcsiRequestIn
+    (the two engines share the exact same live CCSI computation), plus the
+    client name shown on the report's cover/Client Information front
+    matter. See engine/overview_report_builder.py's module docstring for
+    what this Stage-1 endpoint does and doesn't produce yet."""
+    client_name: str = Field(description="Client name shown on the report cover and Client Information page")
+    birth: BirthDetailsIn
+    transit: CcsiTransitDetailsIn | None = None  # None/omitted = right now, at the birth location

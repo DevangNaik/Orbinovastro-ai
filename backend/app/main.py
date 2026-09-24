@@ -11,6 +11,21 @@ Endpoints:
   POST /api/kp-beta       -> BETA: KP sub lords + significators (no LLM call)
   POST /api/navamsa       -> BETA: D9 Navamsa divisional chart (no LLM call)
   POST /api/transit       -> mechanical-layer transit vs natal chart (no LLM call)
+  POST /api/ccsi          -> CCSI (Cusp Conflict Stress Indicator) connection
+                              scoring -- FULLY VALIDATED (2026-09-24, 132/132
+                              real cells) against the client's own HIT_CALC
+                              output. Feeds the paid Overview Report. See
+                              engine/ccsi.py.
+  POST /api/overview-report -> STAGE 1 (2026-09-24) of the paid Overview
+                              Report PDF: the core 5-part Life Balance Index
+                              report, computed live from /api/ccsi's own
+                              engine + an OpenAI interpretation pass. Does
+                              NOT yet include the Kundli chart/Troubles &
+                              Misfortune/South Indian chart pages (Stage 2,
+                              not started), and its house/planet life-area
+                              wording is still standard placeholder text,
+                              not the client's own sheet wording -- see
+                              engine/overview_report_builder.py.
   POST /api/teaser        -> free client-facing preview (ascendant/Moon sign
                               + blurb + booking link) -- NOT gated behind a
                               subscription; its whole purpose is to attract
@@ -20,10 +35,10 @@ Endpoints:
   GET  /                  -> serves the frontend (frontend/index.html)
 
 All of /api/geocode, /api/chart, /api/kp-beta, /api/navamsa, /api/transit,
-/api/chat* are gated behind require_active_subscription (see app/auth.py)
--- a no-op today (AUTH_ENABLED=false by default) and enforced once the
-client sets up Supabase Auth + Stripe Billing and flips that flag on.
-/api/teaser is deliberately NOT gated, even once auth is on -- see its
+/api/ccsi, /api/overview-report, /api/chat* are gated behind require_active_subscription (see
+app/auth.py) -- a no-op today (AUTH_ENABLED=false by default) and enforced
+once the client sets up Supabase Auth + Stripe Billing and flips that flag
+on. /api/teaser is deliberately NOT gated, even once auth is on -- see its
 docstring below.
 
 Run locally:
@@ -43,24 +58,27 @@ from dotenv import load_dotenv
 _ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=_ENV_PATH if _ENV_PATH.exists() else None)
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import billing
 from .auth import AUTH_ENABLED, SUPABASE_ANON_KEY, SUPABASE_URL, require_active_subscription
+from .engine.ccsi import CCSI_DISCLAIMER, CcsiReport, compute_ccsi_report
 from .engine.chart import build_chart_from_fields, chart_to_dict
 from .engine.geocode import GeocodeError, geocode_and_resolve_offset
 from .engine.ephemeris import BirthMoment
+from .engine.hit_calc import CcsiRow
 from .engine.kp import compute_kp_beta
 from .engine.teaser import build_teaser
 from .engine.transit import compute_transit, now_as_birth_moment
 from .engine.varga import compute_navamsa
 from .models import (
-    BirthDetailsIn, ChartOut, ChatRequestIn, ChatResponseOut,
+    BirthDetailsIn, CcsiOut, CcsiRequestIn, CcsiRowOut,
+    ChartOut, ChatRequestIn, ChatResponseOut,
     GeocodeOut, GeocodeRequestIn, KPBetaOut,
-    NavamsaOut, NavamsaPlanetOut, TeaserOut,
+    NavamsaOut, NavamsaPlanetOut, OverviewReportRequestIn, TeaserOut,
     TransitOut, TransitPlanetOut, TransitRequestIn,
 )
 
@@ -254,12 +272,156 @@ def api_transit(body: TransitRequestIn, _user=Depends(require_active_subscriptio
     )
 
 
+def _transit_moment_to_iso_utc(moment: BirthMoment) -> str:
+    """Local civil moment -> ISO-8601 UTC timestamp string, same
+    conversion `engine/transit.py`'s `compute_transit` uses for its own
+    `iso_ts` return value."""
+    from datetime import datetime, timedelta, timezone as dt_timezone
+
+    local_dt = datetime(moment.year, moment.month, moment.day,
+                         moment.hour, moment.minute, moment.second)
+    ut_dt = local_dt - timedelta(hours=moment.utc_offset_hours)
+    return ut_dt.replace(tzinfo=dt_timezone.utc).isoformat()
+
+
+def _ccsi_row_out(row: CcsiRow) -> CcsiRowOut:
+    return CcsiRowOut(
+        houses={str(h): v for h, v in row.houses.items()},
+        columns=dict(row.columns),
+    )
+
+
+def _resolve_natal_and_transit_moments(birth: BirthDetailsIn, transit) -> tuple[BirthMoment, BirthMoment, str]:
+    """Shared by /api/ccsi and /api/overview-report: both take the exact
+    same birth+transit request shape and need the exact same "None/omitted
+    transit = right now, at the birth location" resolution logic. Returns
+    (natal_moment, transit_moment, source), where source is "now (UTC)" or
+    "custom" (matching /api/ccsi's original wording)."""
+    natal_moment = BirthMoment(
+        year=birth.year, month=birth.month, day=birth.day,
+        hour=birth.hour, minute=birth.minute, second=birth.second,
+        utc_offset_hours=birth.utc_offset_hours,
+        latitude=birth.latitude, longitude=birth.longitude,
+    )
+
+    t = transit
+    transit_lat = birth.latitude if (t is None or t.latitude is None) else t.latitude
+    transit_lon = birth.longitude if (t is None or t.longitude is None) else t.longitude
+
+    if t is None or t.year is None:
+        transit_moment = now_as_birth_moment(transit_lat, transit_lon)
+        source = "now (UTC)"
+    else:
+        if t.month is None or t.day is None or t.hour is None or t.minute is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Custom transit moment needs year, month, day, hour, and minute.",
+            )
+        transit_moment = BirthMoment(
+            year=t.year, month=t.month, day=t.day, hour=t.hour, minute=t.minute,
+            utc_offset_hours=t.utc_offset_hours,
+            latitude=transit_lat, longitude=transit_lon,
+        )
+        source = "custom"
+
+    return natal_moment, transit_moment, source
+
+
+@app.post("/api/ccsi", response_model=CcsiOut)
+def api_ccsi(body: CcsiRequestIn, _user=Depends(require_active_subscription)) -> CcsiOut:
+    """CCSI (Cusp Conflict Stress Indicator): the connection-scoring block
+    that feeds the paid Overview Report. FULLY VALIDATED (2026-09-24) --
+    132/132 real cells matched the client's own HIT_CALC output exactly,
+    across all three variants (L, LT, TT) and both net/negative-only rows.
+    See engine/ccsi.py and engine/hit_calc.py module docstrings for the
+    full validation history and the (separate, documented) ayanamsa/node
+    convention this uses versus /api/chart's."""
+    try:
+        natal_moment, transit_moment, source = _resolve_natal_and_transit_moments(body.birth, body.transit)
+        report: CcsiReport = compute_ccsi_report(natal_moment, transit_moment)
+        iso_ts = _transit_moment_to_iso_utc(transit_moment)
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"Could not compute CCSI: {exc}") from exc
+
+    return CcsiOut(
+        l_net=_ccsi_row_out(report.l_net),
+        l_negative=_ccsi_row_out(report.l_negative),
+        lt_net=_ccsi_row_out(report.lt_net),
+        lt_negative=_ccsi_row_out(report.lt_negative),
+        tt_net=_ccsi_row_out(report.tt_net),
+        tt_negative=_ccsi_row_out(report.tt_negative),
+        transit_time_utc=iso_ts,
+        transit_time_source=source,
+        disclaimer=CCSI_DISCLAIMER,
+    )
+
+
 def _require_openai_key() -> None:
     if not os.environ.get("OPENAI_API_KEY"):
         raise HTTPException(
             status_code=503,
             detail="OPENAI_API_KEY is not set. Copy .env.example to .env and add your key.",
         )
+
+
+@app.post("/api/overview-report")
+def api_overview_report(body: OverviewReportRequestIn, _user=Depends(require_active_subscription)) -> Response:
+    """STAGE 1 (2026-09-24) of the paid Overview Report PDF: the core
+    5-part Life Balance Index report (Executive Assessment, Table 1 Houses,
+    Table 2 Planets, Table 3 Strategic Focus, Table 4 Scorecard, Conclusion
+    + Core Message), computed live end-to-end from /api/ccsi's own
+    132/132-validated engine plus an OpenAI interpretation/guidance pass --
+    no caller-supplied hardcoded data anywhere in the chain.
+
+    Deliberately does NOT yet include the Kundli chart tables, Troubles &
+    Misfortune page, or South Indian divisional charts -- see the project
+    roadmap doc's "Overview Report pipeline audited" entry (2026-09-24) for
+    why those are a separate, much larger Stage 2 audit, not started yet.
+    `overview_pdf_writer.build_pdf()` already degrades gracefully without
+    them (its own existing test harness proves this), so Stage 1 renders a
+    complete, correctly-structured report -- just without those extra
+    pages.
+
+    One real, currently-unresolved gap even in what IS returned: the house
+    life-area / planet-signification wording fed into the AI prompt and
+    printed in Table 1/Table 2 is `engine/overview_report/overview_labels.
+    py`'s STANDARD textbook placeholder text, not the client's own
+    HIT_CALC sheet wording (never captured) -- flagged via the
+    `X-Labels-Are-Placeholder` response header and folded into the
+    returned PDF's own disclaimer text. Swap that one module's two dicts
+    for the client's real wording once available; nothing else in this
+    endpoint needs to change.
+
+    Returns the finished PDF as the raw response body (not JSON) --
+    Content-Disposition names it "<client name>_overview.pdf"."""
+    _require_openai_key()
+    from openai import OpenAI
+
+    from .engine.overview_report_builder import build_overview_report_pdf, safe_filename
+
+    try:
+        natal_moment, transit_moment, _source = _resolve_natal_and_transit_moments(body.birth, body.transit)
+        client = OpenAI()
+        result = build_overview_report_pdf(
+            client, body.client_name, natal_moment, transit_moment,
+            birth_place=body.birth.place,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"Overview report generation failed: {exc}") from exc
+
+    filename = f"{safe_filename(body.client_name)}_overview.pdf"
+    return Response(
+        content=result.pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Labels-Are-Placeholder": "true" if result.labels_are_placeholder else "false",
+        },
+    )
 
 
 @app.post("/api/chat", response_model=ChatResponseOut)
