@@ -25,6 +25,18 @@ class PlanetConjunctionOut(BaseModel):
     orb_degrees: float = Field(description="Angular separation in degrees, always positive")
 
 
+class PlanetAspectOut(BaseModel):
+    code: str = Field(description="The other planet's code (or, for aspected_by only, could "
+        "in principle be any graha -- never the Ascendant itself, which is never an aspect "
+        "source, only ever a target)")
+    aspect: str = Field(description="Which aspect this is, as a house-distance ordinal counted "
+        "forward from the source planet's own D1 sign, e.g. '7th' for the universal "
+        "opposition aspect every graha casts, or '4th'/'5th'/'8th'/'9th'/'3rd'/'10th' for "
+        "Mars/Jupiter/Saturn's own special aspects. Not the same numbering as `house` or "
+        "`rasi_house` -- this is always counted from the aspecting planet's sign, not the "
+        "Ascendant's.")
+
+
 class PlanetOut(BaseModel):
     code: str
     name: str
@@ -55,6 +67,26 @@ class PlanetOut(BaseModel):
         description="'Malefic' or 'Benefic' -- standard classical grouping (Sa/Ma/Ra/Ke vs. "
         "Su/Me/Mo/Ju/Ve), the same one this engine's CCSI weighting already uses internally."
     )
+    flags: list[str] = Field(
+        default_factory=list,
+        description="Zero or more of 'Retrograde' / 'Combust' / 'Exalted' / 'Debilitated' / "
+        "'Own Sign' / 'Vargottama', computed from standard classical rules -- the same "
+        "engine/chart_narrative.py logic the Free Preview tab already used, now also here "
+        "so every chart-wheel view (D1, Bhava Chalit, D9, Cuspal) shows them too.",
+    )
+    aspects: list[PlanetAspectOut] = Field(
+        default_factory=list,
+        description="Classical Parashari whole-sign graha drishti this planet casts on other "
+        "planets -- the universal 7th/opposition aspect every graha casts, plus Mars/Jupiter/"
+        "Saturn's own special aspects. NOT generally mutual (a special aspect isn't cast back), "
+        "and NOT the same thing as `conjunctions` (same-sign proximity) or hit_calc.py's own "
+        "Western-angle aspect classification used for CCSI stress scoring.",
+    )
+    aspected_by: list[PlanetAspectOut] = Field(
+        default_factory=list,
+        description="The reverse of `aspects`: which other planets cast a classical graha "
+        "drishti onto this one.",
+    )
 
 
 class HouseOut(BaseModel):
@@ -64,12 +96,38 @@ class HouseOut(BaseModel):
     sign_lord: str
 
 
+class AscendantOut(BaseModel):
+    house: int
+    longitude: float
+    sign: str
+    sign_lord: str
+    degree_in_sign: float
+    nakshatra: str
+    nakshatra_lord: str
+    pada: int
+    meaning: str = Field(
+        description="Same short nakshatra-theme + sign-color sentence every planet's `meaning` "
+        "field carries, computed the same way from the Ascendant's own longitude."
+    )
+    flags: list[str] = Field(
+        default_factory=list,
+        description="Only ever 'Vargottama' or empty -- the Ascendant isn't a planet, so it has "
+        "no retrograde/combust/dignity of its own.",
+    )
+    aspected_by: list[PlanetAspectOut] = Field(
+        default_factory=list,
+        description="Which planets cast a classical graha drishti onto the 1st house/Lagna. "
+        "The Ascendant never casts an aspect of its own (it isn't a graha), so unlike a "
+        "planet's entry there is no `aspects` field here.",
+    )
+
+
 class ChartOut(BaseModel):
     name: str = ""
     place: str = ""
     ayanamsa_deg: float
     ayanamsa_mode: str
-    ascendant: HouseOut
+    ascendant: AscendantOut
     houses: list[HouseOut]
     planets: list[PlanetOut]
     disclaimer: str = (
