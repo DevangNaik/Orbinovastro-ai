@@ -172,10 +172,10 @@ def test_synthesis_reports_correct_kendra_and_trikona_counts():
     expected_trikona = sum(1 for h in graha_houses if h in (1, 5, 9))
     expected_occupied = len(set(graha_houses))
 
-    assert f"{expected_kendra} of 9 placements fall in the angular" in teaser.synthesis
-    assert f"{expected_trikona} of 9 fall in the trinal" in teaser.synthesis
-    assert f"across {expected_occupied} of the twelve houses" in teaser.synthesis
-    assert "not a verdict of favorability" in teaser.synthesis
+    assert f"{expected_kendra} of them sit in the four" in teaser.synthesis
+    assert f"{expected_trikona} fall in the luckiest" in teaser.synthesis
+    assert f"spread across {expected_occupied} of the twelve houses" in teaser.synthesis
+    assert "under real pressure" in teaser.synthesis
 
 
 def test_upgrade_pitch_names_the_paid_diagnostic_report_and_stays_honest():

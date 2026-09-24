@@ -5,47 +5,72 @@ call to book the full paid Diagnostic (the Overview Report).
 UPDATE (2026-09-24, later still): the client's own explicit feedback on
 the live page was that the original one-paragraph Ascendant+Moon blurb
 "doesn't make the user order more... and doesn't even give trust." This
-module was rewritten to be a genuinely extensive D1 analysis -- every one
-of the chart's 9 planets plus the Ascendant, each placed into its own
+module was first rewritten to be a genuinely extensive D1 analysis -- every
+one of the chart's 9 planets plus the Ascendant, each placed into its own
 house and paired with the client's own real, proprietary house/planet
 framing (`overview_report/overview_labels.py`'s `HOUSE_LIFE_AREAS`/
 `PLANET_SIGNIFICATIONS` -- the same real text now used in the paid
-Overview Report), written in a precise, analytical register rather than
-mainstream horoscope-column prose.
+Overview Report).
 
-Design choices, all deliberate:
+UPDATE (2026-09-24, later still again): that first rewrite used a dense,
+academic register ("karaka," "significator," "structural terms," "principal
+channels") per the client's own initial instruction to write it "in the
+language of an MBA and higher learned person." Seeing it rendered, the
+client corrected course: the actual AUDIENCE for this text is a site
+VISITOR, not the client reviewing it -- and a visitor "does not know what
+is structural position." Their words: give people what a placement MEANS
+for them, in plain language, and build curiosity ("what's in it for me")
+rather than academic precision. This module was rewritten again around
+that instruction:
 
-1. STILL template text, not an LLM call -- same reasoning as before, now
-   more important, not less: this endpoint is free and explicitly NOT
-   gated behind require_active_subscription (see main.py), so it is
-   reachable by anyone, including automated abuse. A live OpenAI call per
-   request would put an unbounded, uncapped cost on the client's own API
-   budget for a feature with no payment wall. Every sentence below is
-   composed deterministically from already-validated mechanical-layer
-   chart data (ephemeris.py) and the client's own already-real label
-   text -- free, instant, and exactly reproducible for the same input.
+- Jargon removed: no "karaka," "significator," "structural terms,"
+  "principal channels," or similar meta-commentary. Each placement is
+  described as a plain-language, second-person statement of what it means
+  for the visitor's life.
+- The client's own real short labels (e.g. "Fortune/Dharma") are still
+  surfaced -- this is real, proprietary, traceable content, not something
+  to hide -- but woven in as "what this practice calls it" asides rather
+  than the entire sentence's scaffolding.
+- Curiosity/upsell framing is concentrated at the two bookends (the
+  opening executive summary and the closing synthesis/upgrade_pitch)
+  rather than repeated after every one of the ten placements, which would
+  read as nagging rather than inviting.
+- What a planet "represents" in each placement sentence is drawn ONLY from
+  the client's own real `PLANET_SIGNIFICATIONS` facets (`sig_desc` below),
+  never from a separately-authored generic-astrology description of that
+  planet -- this client's own data does not always match textbook
+  planetary meanings (e.g. their "Su" row reads as emotionally/nurturing
+  rather than the more usual identity/authority framing), and inventing a
+  separate generic description would silently contradict their own real
+  data in the same paragraph. Sign-based color (`SIGN_TRAITS` below) is
+  standard, non-proprietary, and safe to author generically.
+
+Design choices carried over, both still deliberate:
+
+1. STILL template text, not an LLM call -- this endpoint is free and
+   explicitly NOT gated behind require_active_subscription (see main.py),
+   so it is reachable by anyone, including automated abuse. A live OpenAI
+   call per request would put an unbounded, uncapped cost on the client's
+   own API budget for a feature with no payment wall. Every sentence below
+   is composed deterministically from already-validated mechanical-layer
+   chart data (ephemeris.py) and the client's own already-real label text
+   -- free, instant, and exactly reproducible for the same input.
 
 2. Deliberately STOPS at placement description, never scoring or
-   judgment. This preview states WHERE each planet sits and WHICH of the
-   client's own real house/planet domains that activates -- structural
-   fact, not interpretation. It does not compute or imply which
-   placements are under astrological "stress" or "support" (that is
-   exactly what CCSI -- ai_app/backend/app/engine/hit_calc.py + ccsi.py,
-   132/132 validated against the client's real HIT_CALC output -- does,
-   and CCSI is the paid Overview Report's core differentiator). Keeping
-   that line bright is what makes the free/paid boundary a genuine,
-   honest value gap rather than an arbitrary paywall -- and the closing
-   `upgrade_pitch` says so explicitly, in the same precise register,
-   rather than a generic "unlock your full reading" sales line.
-
-3. Register: written for a professionally sophisticated reader, not a
-   mass-market horoscope audience -- the client's own explicit
-   instruction. Analytical vocabulary (signifies/governs/domain/
-   structural/diagnostic), full sentences, no mystical filler, numbers
-   stated as numbers. Classical structural facts used below (which
-   houses are "kendra"/angular, which are "trikona"/trine) are standard,
-   textbook Vedic terminology, not the client's own proprietary scoring
-   -- used only descriptively (counts), never as a favorability verdict.
+   judgment. This preview states WHERE each planet sits and WHAT part of
+   the visitor's life that touches -- descriptive fact, not interpretation.
+   It does not compute or imply which placements are under astrological
+   "stress" or "support" (that is exactly what CCSI -- hit_calc.py +
+   ccsi.py, 132/132 validated against the client's real HIT_CALC output --
+   does, and CCSI is the paid Overview Report's core differentiator).
+   Keeping that line bright is what makes the free/paid boundary a genuine,
+   honest value gap rather than an arbitrary paywall -- the closing
+   `upgrade_pitch` says so explicitly, in plain language, rather than a
+   generic "unlock your full reading" sales line. Classical structural
+   facts used in `synthesis` (which houses are "kendra"/angular, which are
+   "trikona"/trine) are standard, textbook Vedic terminology, not the
+   client's own proprietary scoring -- used only descriptively (counts),
+   never as a favorability verdict.
 """
 from __future__ import annotations
 
@@ -67,22 +92,41 @@ ORDINALS: dict[int, str] = {
 KENDRA_HOUSES = (1, 4, 7, 10)
 TRIKONA_HOUSES = (1, 5, 9)
 
-# One verb phrase per planet (Su, Mo, Ma, Me, Ju, Ve, Sa, Ra, Ke, in that
-# fixed order -- matching ephemeris.compute_natal_chart's own planet order),
-# used to vary the "structural implication" sentence across the nine
-# placements without resorting to a random choice (this module must stay
-# fully deterministic -- see module docstring, point 1).
-_PLACEMENT_VERBS = [
-    "channels its core signification into",
-    "concentrates its influence within",
-    "directs its characteristic drive toward",
-    "expresses its governing function through",
-    "extends its structural influence over",
-    "anchors its principal effect within",
-    "exercises its disciplining influence upon",
-    "routes its underlying pull into",
-    "resolves its detaching influence within",
+# One plain-language closing clause per planet (Su, Mo, Ma, Me, Ju, Ve, Sa,
+# Ra, Ke, in that fixed order -- matching ephemeris.compute_natal_chart's own
+# planet order), so the ten placement sentences don't end on the exact same
+# words nine times in a row. Deliberately plain, not jargon -- see module
+# docstring re: dropping "structural terms"/"principal channels" language.
+_PLACEMENT_CLOSERS = [
+    "so this is one of the places in life where that side of you shows up most clearly",
+    "so this house tends to be where that part of you gets tested and expressed",
+    "so keep an eye here -- it's where that instinct plays out in real life",
+    "so this is a natural outlet for that energy in your day-to-day",
+    "so this house often becomes the stage where that trait takes center stage",
+    "so that part of your nature tends to come out strongest right here",
+    "so this is where you're likely to feel that pull most in practice",
+    "so this house is a common home base for that side of your personality",
+    "so this is one of the clearer windows into how that shows up for you",
 ]
+
+# Short, plain, sign-based color -- standard astrology, not proprietary,
+# safe to author generically. Used to keep each placement sentence from
+# reading identically to the next, without touching the client's own real
+# planet/house data.
+SIGN_TRAITS: dict[str, str] = {
+    "Aries": "bold and quick to act",
+    "Taurus": "steady and comfort-seeking",
+    "Gemini": "curious and quick-thinking",
+    "Cancer": "protective and deeply feeling",
+    "Leo": "warm and hard to overlook",
+    "Virgo": "careful and detail-driven",
+    "Libra": "diplomatic and relationship-minded",
+    "Scorpio": "intense and private",
+    "Sagittarius": "adventurous and big-picture",
+    "Capricorn": "disciplined and patient",
+    "Aquarius": "independent and original",
+    "Pisces": "sensitive and imaginative",
+}
 
 ASCENDANT_BLURBS: dict[str, str] = {
     "Aries": "An Aries ascendant meets the world head-on -- direct, quick to act, energized by a challenge.",
@@ -151,7 +195,7 @@ class PlanetPlacement:
     retrograde: bool
     governs: str        # short signification label, e.g. "Wisdom/Growth"
     house_domain: str    # short house life-area label, e.g. "Creativity/Children"
-    narrative: str       # the full analytical sentence(s) for this placement
+    narrative: str       # the plain-language sentence(s) for this placement
 
 
 @dataclass
@@ -172,23 +216,27 @@ def _ordinal(house: int) -> str:
     return ORDINALS.get(house, str(house))
 
 
-def _placement_narrative(index: int, planet_name: str, sig_label: str, sig_desc: str,
-                           house_num: int, house_label: str, house_desc: str,
-                           sign: str, retrograde: bool) -> str:
-    verb = _PLACEMENT_VERBS[index % len(_PLACEMENT_VERBS)]
-    retro_clause = (
-        f" This placement was retrograde at the time of birth -- classical "
-        f"practice reads this as an internally processed, reassessed "
-        f"expression of {sig_label.lower()} rather than a diminished one."
-        if retrograde else ""
-    )
+def _retro_clause(retrograde: bool) -> str:
+    if not retrograde:
+        return ""
     return (
-        f"{planet_name} -- karaka (significator) for {sig_label} ({sig_desc}) -- "
-        f"is positioned in {sign}, within the {_ordinal(house_num)} house: "
-        f"{house_label} ({house_desc}).{retro_clause} In structural terms, "
-        f"{planet_name} {verb} the domain of {house_label.lower()}, making "
-        f"this house one of the principal channels through which "
-        f"{sig_label.lower()} is expressed in this chart."
+        " This one's retrograde in your chart, which in Vedic practice "
+        "usually means the energy runs inward first -- more reflection "
+        "and revisiting before action, not a weaker placement."
+    )
+
+
+def _placement_narrative(index: int, planet_name: str, sig_label: str, sig_desc: str,
+                          house_num: int, house_label: str, house_desc: str,
+                          sign: str, retrograde: bool) -> str:
+    trait = SIGN_TRAITS.get(sign, "distinctly its own")
+    closer = _PLACEMENT_CLOSERS[index % len(_PLACEMENT_CLOSERS)]
+    return (
+        f"Your {planet_name} sits in {sign} ({trait}), right in your "
+        f"{_ordinal(house_num)} house -- what this practice calls your "
+        f"{house_label} house, the part of life connected to {house_desc}. "
+        f"{planet_name} itself represents {sig_desc} -- your {sig_label} -- "
+        f"{closer}.{_retro_clause(retrograde)}"
     )
 
 
@@ -209,19 +257,14 @@ def build_teaser(chart: NatalChart, name: str = "", book_url: str = DEFAULT_BOOK
     sun_blurb = SUN_BLURBS.get(sun_sign, "")
     blurb = f"{asc_blurb} {moon_blurb}".strip()
 
-    possessive = f"{name.strip()}'s" if name.strip() else "This chart's"
-    asc_label, _asc_desc = _split_label(HOUSE_LIFE_AREAS[1])
+    possessive = f"{name.strip()}'s" if name.strip() else "Your"
     executive_summary = (
-        f"{possessive} Ascendant (Lagna) -- the structural frame through which "
-        f"every other placement in this chart is expressed, and the significator "
-        f"of {asc_label} -- falls in {asc_sign}. {asc_blurb} "
-        f"The Sun, seat of core identity and executive will, is placed in "
-        f"{sun_sign}: {sun_blurb} "
-        f"The Moon, governing cognitive and emotional processing, is placed in "
-        f"{moon_sign}: {moon_blurb} "
-        f"Ascendant, Sun, and Moon together form the chart's baseline operating "
-        f"profile -- the reference frame against which the full nine-planet, "
-        f"twelve-house structure below is read."
+        f"{possessive} chart opens with three placements that matter more "
+        f"than any other: {asc_sign} rising, Sun in {sun_sign}, and Moon in "
+        f"{moon_sign}. {asc_blurb} {sun_blurb} {moon_blurb} Together, these "
+        f"three set the tone for everything else -- the nine planets and "
+        f"twelve houses that follow are really this same story, told in "
+        f"more detail."
     ).strip()
 
     # Ascendant itself, as the first row of the placement table (house 1 by
@@ -229,16 +272,19 @@ def build_teaser(chart: NatalChart, name: str = "", book_url: str = DEFAULT_BOOK
     # text as every other row, for consistency).
     asc_gov_label, asc_gov_desc = _split_label(PLANET_SIGNIFICATIONS["Asc"])
     asc_house_label, asc_house_desc = _split_label(HOUSE_LIFE_AREAS[1])
+    asc_trait = SIGN_TRAITS.get(asc_sign, "distinctly its own")
     placements: list[PlanetPlacement] = [
         PlanetPlacement(
             code="Asc", name="Ascendant", sign=asc_sign, house=1, retrograde=False,
             governs=asc_gov_label, house_domain=asc_house_label,
             narrative=(
-                f"The Ascendant -- karaka (significator) for {asc_gov_label} "
-                f"({asc_gov_desc}) -- rises in {asc_sign}, defining the first "
-                f"house: {asc_house_label} ({asc_house_desc}). Every other "
-                f"placement in this chart is read relative to this one, making "
-                f"it the fixed reference point of the entire structure."
+                f"Your Ascendant -- what this practice calls your "
+                f"{asc_gov_label} placement, covering {asc_gov_desc} -- "
+                f"rises in {asc_sign} ({asc_trait}). It defines your first "
+                f"house, the {asc_house_label} house: {asc_house_desc}. "
+                f"Think of it as the filter everything else in your chart "
+                f"passes through -- your natural approach to life, and the "
+                f"first impression you make on anyone you meet."
             ),
         )
     ]
@@ -263,33 +309,31 @@ def build_teaser(chart: NatalChart, name: str = "", book_url: str = DEFAULT_BOOK
     occupied_houses = len(set(graha_houses))
 
     synthesis = (
-        f"Viewed as a whole, this chart distributes its nine planetary "
-        f"placements across {occupied_houses} of the twelve houses. "
-        f"{kendra_count} of 9 placements fall in the angular (kendra) houses "
-        f"-- the first, fourth, seventh, and tenth, the classical structural "
-        f"axis of self, home, partnership, and career -- and {trikona_count} "
-        f"of 9 fall in the trinal (trikona) houses -- the first, fifth, and "
-        f"ninth, associated with fortune, creativity, and higher purpose. "
-        f"These are structural counts, not a verdict of favorability: this "
-        f"preview describes WHERE each planet sits, not whether that "
-        f"placement is presently operating under supportive or adverse "
-        f"astrological pressure."
+        f"Step back and look at the whole chart: your nine planets are "
+        f"spread across {occupied_houses} of the twelve houses in your "
+        f"life. {kendra_count} of them sit in the four \"power houses\" -- "
+        f"self, home, relationships, and career -- and {trikona_count} "
+        f"fall in the luckiest, most fortune-linked houses in the chart. "
+        f"That's the shape of it. What it doesn't tell you is which of "
+        f"these areas are running smoothly for you right now and which "
+        f"ones are under real pressure -- that's a completely different "
+        f"question, tied to your current planetary period and today's sky, "
+        f"and it's exactly what the full Diagnostic Report is built to "
+        f"answer."
     )
 
     upgrade_pitch = (
-        f"This is precisely where the free preview stops, by design. "
-        f"Placement -- which sign, which house, which of your twelve life "
-        f"domains each planet activates -- is descriptive fact, "
-        f"and it is shown above in full, across all nine planets and the "
-        f"Ascendant. What it does not yet tell you is how those placements "
-        f"interact: which houses are presently reinforced and which are "
-        f"under measurable stress, both in this natal chart and under "
-        f"today's transiting sky, and how your current planetary period "
-        f"(dasha) is activating specific placements right now. That "
-        f"quantified, house-by-house diagnostic -- built on this practice's "
-        f"own proprietary connection-and-stress scoring methodology -- is "
-        f"the core of the full Diagnostic Report, delivered as a complete "
-        f"written assessment, not a set of raw numbers."
+        f"Here's the honest split between what's free and what's not. "
+        f"Everything above tells you WHERE each planet sits and what part "
+        f"of your life it touches -- that's placement, and you now have "
+        f"all of it, for free. What it can't tell you is whether those "
+        f"placements are currently working in your favor, running under "
+        f"stress, or about to shift -- that's a moving picture, driven by "
+        f"your current planetary period (dasha) and the sky right now, not "
+        f"a fixed one. Mapping that out, house by house, planet by planet, "
+        f"is exactly what the full Diagnostic Report does -- and if you've "
+        f"read this far, you're probably already curious enough to want "
+        f"that answer."
     )
 
     return TeaserResult(

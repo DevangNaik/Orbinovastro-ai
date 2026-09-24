@@ -69,6 +69,23 @@ astrology math itself.
 > guidance -- this is a genuinely bigger view now, not a small tweak, and
 > it should be laid out accordingly (see "Visual design pass" below too).
 
+> **Update (2026-09-24, later still still): correction -- there should be
+> ONE Transit input on this whole page, not two.** The previous version of
+> this update told you to build a dedicated Transit sub-section (with its
+> own "Use birth location" toggle) specifically for the "Get My Full
+> Report" flow. That was a mistake on this document's part and it produced
+> exactly the confusion the client then reported: the page already HAS a
+> Transit tab (item 5 below, the one that calls `/api/transit`) -- adding a
+> second, separate transit control inside the Preview/Report flow duplicated
+> it and desynced from it. **If you already built that second control per
+> the earlier instruction, remove it.** The corrected, final rule: "Get My
+> Full Report" reuses the exact date/time currently held by the page's ONE
+> existing Transit tab -- it does not get its own date/time input at all.
+> The transit location is always the birth chart's own location, full stop
+> -- never ask the visitor for a separate transit location anywhere on this
+> page. See the rewritten item 3 under "What to build" and the rewritten
+> `/api/overview-report` request section below for the specifics.
+
 ## Why this shape (read this before building)
 
 The astrology calculations (Swiss Ephemeris positions, KP Sub Lords, house
@@ -174,6 +191,31 @@ and Preview / Chart / Transit / KP Significators / Chat tabs):
    This is a paid feature: if/when auth is switched on for the site, this is
    one of the endpoints that should sit behind sign-in/subscription, same as
    `/api/chart`/`/api/kp-beta`/etc. — everything except `/api/teaser`.
+
+   **Transit for this report — reuse the page's ONE existing Transit tab,
+   do not build a second transit input anywhere else** (this corrects a real
+   bug from an earlier build: a second, separate transit control got added
+   to the Preview/Report flow, which desynced from the real Transit tab and
+   produced a report that ignored what the visitor had actually set):
+   - The page already has exactly one Transit input — the date/time picker
+     in the Transit tab (item 5 below), used for `/api/transit`. "Get My
+     Full Report" reuses that SAME state. It does not get its own date/time
+     field, its own picker, or any location control of its own.
+   - If the Transit tab's date/time is still blank, that means "right now"
+     — omit `year`/`month`/`day`/`hour`/`minute` from the `transit` object
+     in the `/api/overview-report` request entirely (same meaning it
+     already has for `/api/transit`). If the visitor has set a specific
+     date/time in the Transit tab, send that exact value.
+   - **Transit location is always the birth chart's own location — never
+     ask the visitor for a separate transit location anywhere on this
+     page.** Simply omit `transit.latitude`/`longitude`/`place` from the
+     request always; the backend defaults them to the birth details
+     automatically. There is nothing to toggle and nothing to sync — this
+     is just always true.
+   - Net effect: the only thing that varies in the `transit` object across
+     requests is the date/time, taken directly from the Transit tab's
+     current state; everything else about "transit" for this report is
+     simply "the birth chart's own location."
 4. A **Chart** view, expanded into **four linked reference charts** sharing
    one set of planet data from a single `/api/chart` call plus one
    `/api/navamsa` call — each one drawn as a real **North Indian chart-wheel
@@ -573,15 +615,33 @@ areas, conclusion), built from the same validated CCSI scoring engine behind
 `/api/ccsi`, with an OpenAI-written interpretation layer. **Takes roughly
 1–3 minutes to respond** — see rule 7 above.
 
-Request (same `BirthDetailsIn`/optional `transit` shape as `/api/transit`,
-plus a `client_name`):
+Request (same `BirthDetailsIn` shape as `/api/chart`, plus a `client_name`
+and a `transit` object built from the page's ONE existing Transit tab --
+see "What to build" item 3 above, do not build a second transit input):
 ```json
 {
   "client_name": "Devang Naik",
   "birth": { "...same BirthDetailsIn shape as /api/chart..." },
-  "transit": { "...optional, same shape as /api/transit's transit field, or omit for right now..." }
+  "transit": {
+    "year": 2026, "month": 12, "day": 25, "hour": 0, "minute": 0,
+    "utc_offset_hours": 5.5
+  }
 }
 ```
+Only the date/time fields ever vary here, taken directly from the Transit
+tab's current state:
+- If the Transit tab's date/time is blank, omit the whole `transit` object
+  (or send it with `year`/`month`/`day`/`hour`/`minute` all absent) -- this
+  means "right now," the same as it already does for `/api/transit`.
+- If the visitor set a specific date/time in the Transit tab, send that
+  exact value, with whatever UTC offset the Transit tab itself uses for it
+  (mirroring the birth details' own `utc_offset_hours` is fine, same as
+  `/api/transit` already does).
+- **Never send `latitude`/`longitude`/`place` on this request.** Leave them
+  out always, every time -- the backend automatically uses the birth
+  details' own location when they're absent, which is exactly the
+  behavior wanted here. There is no transit-location control on this page
+  at all.
 
 Response on success: **not JSON** — a raw PDF binary
 (`Content-Type: application/pdf`, `Content-Disposition: attachment;
@@ -666,3 +726,16 @@ something Codex needs to handle.
    has multiple pages, not just a cover). Also try it with a deliberately
    invalid input (if easy to trigger) and confirm the error message shown to
    the user is readable, not a raw stack trace or a silent failure.
+8. Confirm there is exactly ONE Transit input on the whole page (the
+   existing Transit tab) and that "Get My Full Report" has no transit
+   input of its own. Then specifically test the wiring, since an earlier
+   build got this wrong: (a) with the Transit tab's date/time still blank,
+   generate a report and confirm its Client Information page shows the
+   birth location with a transit time close to the actual moment you
+   clicked the button; (b) set a clearly different date in the Transit
+   tab (e.g. a date months away), generate another report, and confirm
+   THIS TIME the Transit Information page shows exactly that date, still
+   at the birth location (never a different location -- there's no control
+   for that); (c) switch to the Transit tab itself and confirm computing a
+   transit there still works exactly as before -- this change should be
+   invisible to that existing feature.
