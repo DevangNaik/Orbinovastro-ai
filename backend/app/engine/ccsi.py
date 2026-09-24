@@ -4,27 +4,28 @@ fully-validated `hit_calc.py` engine to a real chart, instead of the
 hardcoded reference-chart dictionaries the test files use.
 
 Why this module exists on its own, rather than reusing `ephemeris.py`'s
-`compute_natal_chart`: `ephemeris.py` uses ayanamsa mode 5
-("Krishnamurti (KP)") and the TRUE lunar node for Rahu -- the stand-in
-this app's free/live chart features (Chart, Transit, KP Significators
-beta, D9 beta, Preview) use pending the client's confirmation of their
-exact ayanamsa. The CCSI engine, however, has its OWN separately
-confirmed convention -- ayanamsa mode 45 (Krishnamurti VP291) plus
-`dasha.CONFIRMED_AYANAMSA_DIFF`, and the MEAN lunar node for Rahu/Ketu --
-empirically back-solved and validated against real client data (see
-`dasha.py`/`kp_lords.py`'s docstrings, and `hit_calc.py`'s own 132/132
-real-cell validation, which used exactly this convention). Reusing
-`ephemeris.py` here would silently feed `hit_calc.py` numbers computed
-under the WRONG ayanamsa/node convention -- close, but not the one that
-was actually validated. This module exists to keep that distinction
-explicit rather than let it get blurred at a call site.
+`compute_natal_chart`: historically, `ephemeris.py` used ayanamsa mode 5
+("Krishnamurti (KP)") and the TRUE lunar node for Rahu, while this module
+has its OWN separately confirmed convention -- ayanamsa mode 45
+(Krishnamurti VP291) plus `dasha.CONFIRMED_AYANAMSA_DIFF`, and the MEAN
+lunar node for Rahu/Ketu -- empirically back-solved and validated against
+real client data (see `dasha.py`/`kp_lords.py`'s docstrings, and
+`hit_calc.py`'s own 132/132 real-cell validation, which used exactly this
+convention).
 
-These two conventions are a known, documented discrepancy in this
-engagement (see the project roadmap doc) -- not yet reconciled, because
-reconciling them is the client's call, not a silent side effect of this
-port. Until that happens, this module and `ephemeris.py` will keep
-producing slightly different planetary degrees for the same birth data,
-on purpose.
+UPDATE (2026-09-24, later still again): this discrepancy is now RESOLVED
+-- the client confirmed switching the free-tier chart features to this
+same convention, after it was validated against their real Excel Kundli
+worksheet data (all 9 planets + Ascendant matched to within 0.0002
+degrees; see `ephemeris.py`'s own module docstring and project doc
+`ayanamsa-and-nature-findings-2026-09-24.md`). `ephemeris.py` now imports
+`CONFIRMED_AYANAMSA_DIFF`/`DEFAULT_AYANAMSA_ID`/`SWE_FLAGS` from
+`dasha.py` and uses this exact convention too, so this module and
+`ephemeris.py` now agree on planetary degrees for the same birth data.
+This module is kept separate regardless -- not because the conventions
+differ anymore, but so `hit_calc.py`'s proprietary scoring math never
+gets a direct dependency on the free-tier chart module, and so a future
+change to one path can't silently drag the other along with it.
 
 Scope: given a natal `BirthMoment` and a transit `BirthMoment` (typically
 "now", at either the natal birthplace or wherever the client specifies --
@@ -132,12 +133,12 @@ CCSI_DISCLAIMER = (
     "this engine's own Swiss Ephemeris positions -- VALIDATED (2026-09-24) "
     "against the client's real HIT_CALC output: 132/132 real cells matched "
     "exactly across all three variants (L, LT, TT), net and Negative Hits "
-    "Only. Uses a SEPARATE, independently-confirmed ayanamsa/node "
-    "convention from this app's free chart features (mode 45 Krishnamurti "
-    "VP291 + a confirmed correction, mean lunar node for Rahu/Ketu) -- "
-    "planetary degrees here will differ slightly from /api/chart's for the "
-    "same birth data; that discrepancy is real, documented, and not yet "
-    "reconciled by the client. The transit side uses whatever moment/"
+    "Only. Uses the same independently-confirmed ayanamsa/node convention "
+    "as this app's free chart features (mode 45 Krishnamurti VP291 + a "
+    "confirmed correction, mean lunar node for Rahu/Ketu) -- as of "
+    "2026-09-24 the two are reconciled, so planetary degrees here should "
+    "match /api/chart's for the same birth data. The transit side uses "
+    "whatever moment/"
     "location the caller supplies; the client's own convention for which "
     "location their 'current' transit snapshot uses is still unconfirmed "
     "(see the project roadmap doc)."

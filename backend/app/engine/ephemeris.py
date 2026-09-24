@@ -12,12 +12,36 @@ Explicitly OUT of scope for this module (left for a later, validated port):
   - Divisional (varga) charts beyond D1 (Rasi)
   - Connection-scoring / prediction logic (ConnSummaryCore, WTDSCORE, etc.)
   - Dasha/Bhukti/Antra period selection and "allowed" filtering
-  - The client's exact ayanamsa ("Devarajayan" named cell in the workbook,
-    whose source value is still unconfirmed -- see open question #1 in the
-    roadmap doc). This module defaults to the standard Krishnamurti (KP)
-    ayanamsa built into Swiss Ephemeris instead, which is the closest
-    well-defined stand-in until that's resolved. Swap AYANAMSA_MODE below
-    once the client confirms Devarajayan's actual source.
+
+UPDATE (2026-09-24, later still again): this module now uses the SAME
+ayanamsa/node convention as `ccsi.py`'s already-validated engine (mode 45
+"Krishnamurti VP291" + `dasha.CONFIRMED_AYANAMSA_DIFF`, MEAN lunar node
+for Rahu/Ketu) instead of the old mode-5/true-node stand-in. This was
+previously a KNOWN, DELIBERATELY UNRECONCILED discrepancy between this
+module (used by /api/chart, teaser.py, kp.py, varga.py, transit.py -- the
+free-tier chart features) and ccsi.py (the paid CCSI engine) -- see
+ccsi.py's own docstring, still accurate about the discrepancy's history
+even though it's now resolved here.
+
+It was reconciled by validating against the client's own real Excel Kundli
+worksheet data for the reference chart (1973-10-12, 14:55 IST, Amalsad):
+under this convention, all 9 planets AND the Ascendant match the client's
+real degree-in-sign, nakshatra, and pada to within 0.0002 degrees (pure
+rounding) -- see project doc `ayanamsa-and-nature-findings-2026-09-24.md`
+for the full comparison table. The old mode-5/true-node convention was off
+by a consistent ~0.08 degrees on every planet, and further off on Rahu/
+Ketu specifically because of the true-node-vs-mean-node difference. The
+client confirmed switching to this convention (2026-09-24).
+
+`CONFIRMED_AYANAMSA_DIFF`, `DEFAULT_AYANAMSA_ID`, and `SWE_FLAGS` are
+imported from `dasha.py` rather than redefined here, so there is exactly
+one source of truth for these calibration constants -- `dasha.py` has no
+imports of its own (confirmed no circular import), and these three names
+are pure Swiss Ephemeris calibration values, not proprietary
+scoring/weighting logic, so importing them here does not cross the free/
+paid boundary the teaser.py AST-import-guard test protects (that test
+only checks teaser.py's own direct imports, and teaser.py imports this
+module, not dasha.py, directly).
 
 All positions are SIDEREAL (tropical minus ayanamsa), matching KP practice.
 """
@@ -30,14 +54,20 @@ from typing import Optional
 
 import swisseph as swe
 
+from .dasha import CONFIRMED_AYANAMSA_DIFF, DEFAULT_AYANAMSA_ID, SWE_FLAGS
+
 # ---------------------------------------------------------------------------
 # Ayanamsa
 # ---------------------------------------------------------------------------
-# Standard Krishnamurti ayanamsa (Swiss Ephemeris sidereal mode 5). The VBA
-# engine instead diffs against a named cell "Devarajayan" whose source is
-# still unconfirmed by the client (see roadmap doc open question #1) -- once
-# confirmed, replace this with the client's actual ayanamsa value/formula.
-AYANAMSA_MODE = swe.SIDM_KRISHNAMURTI
+# Krishnamurti VP291 (Swiss Ephemeris sidereal mode 45) + the empirically
+# confirmed diff -- the same convention `ccsi.py` already uses, now
+# validated against the client's real Excel data for the free-tier chart
+# features too (see module docstring UPDATE above). `AYANAMSA_MODE` is kept
+# as a name for backward compatibility with anything reading it, but the
+# diff correction below is what actually makes this match -- switching
+# `mode` away from `DEFAULT_AYANAMSA_ID` without also revisiting the diff
+# would NOT reproduce the confirmed convention (no caller does this today).
+AYANAMSA_MODE = DEFAULT_AYANAMSA_ID
 
 # ---------------------------------------------------------------------------
 # Reference data
@@ -51,13 +81,36 @@ PLANET_IDS: dict[str, int] = {
     "Ju": swe.JUPITER,
     "Ve": swe.VENUS,
     "Sa": swe.SATURN,
-    "Ra": swe.TRUE_NODE,  # Rahu = true lunar node
+    "Ra": swe.MEAN_NODE,  # Rahu = MEAN lunar node (confirmed convention,
+    # see module docstring UPDATE -- was swe.TRUE_NODE until 2026-09-24).
     # Ketu is always 180 deg from Rahu, handled specially below.
+}
+
+# Uranus/Neptune/Pluto -- NEW (2026-09-24, even later still), client-
+# requested. Deliberately kept OUT of `PLANET_IDS`/the 9-code list
+# `compute_natal_chart` loops over, so every classical-9-planet-only
+# consumer (teaser.py, kp.py significators, varga.py D9, ccsi.py/
+# hit_calc.py CCSI scoring, dasha.py) is completely unaffected -- KP
+# practice and this engagement's validated proprietary engines don't use
+# the outer planets at all. Instead, `compute_outer_planets()` below
+# computes these three separately, and only chart.py's `chart_to_dict()`
+# (the /api/chart response) merges them into its own `planets` list, with
+# no `nature`/`functional_nature` (outer planets have no classical
+# natural-benefic/malefic assignment, and rule no sign, so
+# `functional_nature()` already returns None for them with no code
+# change needed) and excluded from `conjunctions`/`aspects` (classical
+# Parashari conjunctions/graha-drishti are a graha-only concept -- see
+# chart.py's own docstring for exactly how they're merged in).
+OUTER_PLANET_IDS: dict[str, int] = {
+    "Ur": swe.URANUS,
+    "Ne": swe.NEPTUNE,
+    "Pl": swe.PLUTO,
 }
 
 PLANET_FULL_NAME: dict[str, str] = {
     "Su": "Sun", "Mo": "Moon", "Ma": "Mars", "Me": "Mercury",
     "Ju": "Jupiter", "Ve": "Venus", "Sa": "Saturn", "Ra": "Rahu", "Ke": "Ketu",
+    "Ur": "Uranus", "Ne": "Neptune", "Pl": "Pluto",
 }
 
 RASHI_NAMES = [
@@ -143,6 +196,11 @@ class NatalChart:
     planets: list[PlanetPosition] = field(default_factory=list)
     ascendant: Optional[HouseCusp] = None
     houses: list[HouseCusp] = field(default_factory=list)
+    # Uranus/Neptune/Pluto -- kept SEPARATE from `planets` on purpose (see
+    # the OUTER_PLANET_IDS comment above); most callers should keep
+    # ignoring this field entirely, since it exists only for chart.py's
+    # `chart_to_dict()` to merge into its own /api/chart response.
+    outer_planets: list[PlanetPosition] = field(default_factory=list)
 
 
 def sign_for_longitude(sid_long: float) -> tuple[str, str, float]:
@@ -190,24 +248,39 @@ def get_ayanamsa_deg(jd_ut: float, mode: int = AYANAMSA_MODE) -> float:
     return swe.get_ayanamsa_ut(jd_ut)
 
 
-def compute_planet(code: str, jd_ut: float, mode: int = AYANAMSA_MODE) -> PlanetPosition:
-    """Sidereal longitude + sign/nakshatra breakdown for one planet.
-    Rahu is the true lunar node; Ketu is always exactly 180 deg from Rahu.
+def _confirmed_sidereal_longitude_and_speed(jd_ut: float, planet_id: int) -> tuple[float, float]:
+    """One body's sidereal longitude + daily motion (speed), under the
+    SAME confirmed convention ccsi.py's own `_confirmed_sidereal_longitude`
+    uses: ayanamsa mode 45 (`DEFAULT_AYANAMSA_ID`) + `CONFIRMED_AYANAMSA_DIFF`,
+    with `dasha.SWE_FLAGS` (sidereal, true position, no nutation) plus
+    `FLG_SPEED` added so retrograde can still be read off speed -- adding
+    FLG_SPEED does not change the returned longitude, only whether a speed
+    value is also computed, so this still reproduces ccsi.py's validated
+    longitudes exactly."""
+    swe.set_sid_mode(DEFAULT_AYANAMSA_ID, 0, 0)
+    result, _flags = swe.calc_ut(jd_ut, planet_id, SWE_FLAGS | swe.FLG_SPEED)
+    raw = result[0] % 360.0
+    longitude = (raw + CONFIRMED_AYANAMSA_DIFF) % 360.0
+    return longitude, result[3]
 
-    BUG FIXED (2026-09-24, latest): Rahu was never marked retrograde.
-    Ketu (the special-cased branch just below) has always correctly been
-    hardcoded `retrograde=True` -- by convention, not measured, since the
-    lunar nodes are computational points, not physical bodies, and Vedic
-    practice treats them as permanently retrograde. Rahu instead fell
-    through to the general branch, where the old line
-    `retrograde = speed_long < 0 and code not in ("Ra", "Ke")` explicitly
-    forced it to `False` no matter what Swiss Ephemeris' own speed
-    reported -- an inconsistency with Ketu, caught by the client noticing
-    Rahu never showed the retrograde marker while Ketu (always exactly
-    180 degrees away) always did. Fixed by hardcoding Rahu to `True` too,
-    the same convention Ketu already used, rather than reading its
-    (usually-but-not-always negative) true-node speed."""
-    set_ayanamsa(mode)
+
+def compute_planet(code: str, jd_ut: float, mode: int = AYANAMSA_MODE) -> PlanetPosition:
+    """Sidereal longitude + sign/nakshatra breakdown for one planet, under
+    the confirmed ayanamsa/node convention (see module docstring UPDATE).
+    Rahu is the MEAN lunar node; Ketu is always exactly 180 deg from Rahu.
+
+    The `mode` parameter is kept for signature compatibility (nothing
+    calls this with a non-default `mode` today), but the actual
+    computation always applies `CONFIRMED_AYANAMSA_DIFF` on top of
+    `DEFAULT_AYANAMSA_ID`, exactly mirroring ccsi.py -- see
+    `_confirmed_sidereal_longitude_and_speed`.
+
+    Rahu and Ketu are both hardcoded `retrograde=True` -- by convention,
+    not measured, since the lunar nodes are computational points, not
+    physical bodies, and Vedic practice treats them as permanently
+    retrograde (this was a real bug fix in an earlier round: Rahu used to
+    fall through to the general branch and read its own, usually-but-not-
+    always-negative node speed instead)."""
     if code == "Ke":
         rahu = compute_planet("Ra", jd_ut, mode)
         ke_long = normalize360(rahu.longitude + 180.0)
@@ -216,11 +289,11 @@ def compute_planet(code: str, jd_ut: float, mode: int = AYANAMSA_MODE) -> Planet
         return PlanetPosition("Ke", "Ketu", ke_long, sign, sign_lord,
                                deg_in_sign, nak, nak_lord, pada, retrograde=True)
 
-    planet_id = PLANET_IDS[code]
-    flags = swe.FLG_SWIEPH | swe.FLG_SIDEREAL | swe.FLG_SPEED
-    result, _ret_flags = swe.calc_ut(jd_ut, planet_id, flags)
-    longitude, _lat, _dist, speed_long = result[0], result[1], result[2], result[3]
-    longitude = normalize360(longitude)
+    # NOTE: swe.SUN == 0, so this must be an explicit `in` check, not
+    # `PLANET_IDS.get(code) or ...` (0 is falsy and would wrongly fall
+    # through to OUTER_PLANET_IDS and KeyError on "Su").
+    planet_id = PLANET_IDS[code] if code in PLANET_IDS else OUTER_PLANET_IDS[code]
+    longitude, speed_long = _confirmed_sidereal_longitude_and_speed(jd_ut, planet_id)
     sign, sign_lord, deg_in_sign = sign_for_longitude(longitude)
     nak, nak_lord, pada = nakshatra_for_longitude(longitude)
     retrograde = True if code == "Ra" else speed_long < 0
@@ -228,28 +301,44 @@ def compute_planet(code: str, jd_ut: float, mode: int = AYANAMSA_MODE) -> Planet
                            sign_lord, deg_in_sign, nak, nak_lord, pada, retrograde)
 
 
+def compute_outer_planets(jd_ut: float, mode: int = AYANAMSA_MODE) -> list[PlanetPosition]:
+    """Uranus, Neptune, Pluto -- same computation as `compute_planet`
+    (real physical bodies, so genuinely speed-based retrograde, not the
+    Ra/Ke hardcoded convention), kept as a SEPARATE function rather than
+    folded into `compute_natal_chart`'s own 9-planet loop so every
+    classical-9-planet-only consumer stays unaffected. See the
+    `OUTER_PLANET_IDS` comment above for the full reasoning."""
+    return [compute_planet(code, jd_ut, mode) for code in OUTER_PLANET_IDS]
+
+
 def compute_houses(jd_ut: float, lat: float, lon: float,
                     mode: int = AYANAMSA_MODE) -> tuple[HouseCusp, list[HouseCusp]]:
-    """Ascendant + 12 Placidus house cusps, sidereal.
+    """Ascendant + 12 Placidus house cusps, sidereal, under the confirmed
+    ayanamsa convention (mode 45 + `CONFIRMED_AYANAMSA_DIFF`) -- exactly
+    mirroring `ccsi.compute_ccsi_houses`, whose own docstring notes house 1
+    is confirmed to equal the Ascendant exactly against real client data,
+    which is why the Ascendant below is sourced from house 1 rather than
+    computed separately from `ascmc[0]`.
 
-    NOTE: the VBA audit found the client's workbook has TWO different
-    house-cusp implementations (one tropical, one sidereal -- see roadmap
-    doc open question #2/#14), and it's unconfirmed which one feeds the
-    client's actual chart display. This port uses sidereal cusps, the
-    standard choice for KP-style house-based analysis; revisit once the
-    client confirms which convention their production charts use.
+    NOTE (unrelated to the ayanamsa fix above): the VBA audit found the
+    client's workbook has TWO different house-cusp implementations (one
+    tropical, one sidereal -- see roadmap doc open question #2/#14), and
+    it's unconfirmed which one feeds the client's actual chart display.
+    This port uses sidereal Placidus cusps, the standard choice for
+    KP-style house-based analysis; revisit once the client confirms which
+    convention their production charts use.
     """
-    set_ayanamsa(mode)
-    cusps, ascmc = swe.houses_ex(jd_ut, lat, lon, b"P", flags=swe.FLG_SIDEREAL)
-    asc_long = normalize360(ascmc[0])
-    asc_sign, asc_lord, _ = sign_for_longitude(asc_long)
-    ascendant = HouseCusp(1, asc_long, asc_sign, asc_lord)
+    swe.set_sid_mode(DEFAULT_AYANAMSA_ID, 0, 0)
+    cusps, _ascmc = swe.houses_ex(jd_ut, lat, lon, b"P", flags=swe.FLG_SIDEREAL)
 
     houses: list[HouseCusp] = []
     for house_num in range(1, 13):
-        cusp_long = normalize360(cusps[house_num - 1])
+        cusp_long = normalize360(cusps[house_num - 1] + CONFIRMED_AYANAMSA_DIFF)
         sign, lord, _ = sign_for_longitude(cusp_long)
         houses.append(HouseCusp(house_num, cusp_long, sign, lord))
+
+    asc = houses[0]
+    ascendant = HouseCusp(1, asc.longitude, asc.sign, asc.sign_lord)
     return ascendant, houses
 
 
@@ -258,7 +347,9 @@ def compute_natal_chart(moment: BirthMoment, mode: int = AYANAMSA_MODE) -> Natal
     ayanamsa_deg = get_ayanamsa_deg(jd_ut, mode)
     planets = [compute_planet(code, jd_ut, mode) for code in
                ["Su", "Mo", "Ma", "Me", "Ju", "Ve", "Sa", "Ra", "Ke"]]
+    outer_planets = compute_outer_planets(jd_ut, mode)
     ascendant, houses = compute_houses(jd_ut, moment.latitude, moment.longitude, mode)
-    mode_name = {5: "Krishnamurti (KP)"}.get(mode, str(mode))
+    mode_name = {45: "Krishnamurti VP291 + confirmed diff"}.get(mode, str(mode))
     return NatalChart(ayanamsa_deg=ayanamsa_deg, ayanamsa_mode=mode_name,
-                       planets=planets, ascendant=ascendant, houses=houses)
+                       planets=planets, ascendant=ascendant, houses=houses,
+                       outer_planets=outer_planets)

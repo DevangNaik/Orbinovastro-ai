@@ -1,9 +1,15 @@
 """Sanity checks for the mechanical-layer ephemeris engine.
 
-Not a substitute for validating against the client's actual production
-workbook (that requires resolving the open ayanamsa/house-cusp questions
-in the roadmap doc first) -- these just confirm the engine computes
-internally-consistent, plausible sidereal positions and doesn't crash.
+Most of these just confirm the engine computes internally-consistent,
+plausible sidereal positions and doesn't crash -- not a substitute for
+validating against the client's actual production data. The
+`test_confirmed_ayanamsa_convention_matches_real_excel_data` class below
+IS that validation, for the ayanamsa/node convention specifically: it
+locks in the switch (2026-09-24) to the same mode-45+diff/mean-node
+convention ccsi.py already used, against the client's real Excel Kundli
+worksheet values for the reference chart -- see
+ayanamsa-and-nature-findings-2026-09-24.md (project doc) for the full
+comparison this was derived from.
 
 Run with:  python -m pytest tests/ -v   (from backend/)
 """
@@ -36,6 +42,20 @@ def test_all_nine_grahas_present():
     chart = _reference_chart()
     codes = {p.code for p in chart.planets}
     assert codes == {"Su", "Mo", "Ma", "Me", "Ju", "Ve", "Sa", "Ra", "Ke"}
+
+
+def test_outer_planets_are_kept_separate_from_the_classical_nine():
+    """Uranus/Neptune/Pluto (2026-09-24, yet even later still) live on
+    `chart.outer_planets`, NOT `chart.planets` -- by design, so every
+    classical-9-planet-only consumer of compute_natal_chart (teaser.py,
+    kp.py significators, varga.py D9, ccsi.py/hit_calc.py CCSI scoring,
+    dasha.py) stays completely unaffected. Only chart.py's
+    `chart_to_dict()` merges them back in for the /api/chart response."""
+    chart = _reference_chart()
+    assert {p.code for p in chart.planets} == {
+        "Su", "Mo", "Ma", "Me", "Ju", "Ve", "Sa", "Ra", "Ke",
+    }
+    assert {p.code for p in chart.outer_planets} == {"Ur", "Ne", "Pl"}
 
 
 def test_rahu_ketu_are_exactly_opposite():
@@ -119,3 +139,70 @@ def test_every_planet_has_valid_rasi_house():
     data = chart_to_dict(chart)
     for p in data["planets"]:
         assert 1 <= p["rasi_house"] <= 12
+
+
+# --- Confirmed ayanamsa/node convention (2026-09-24, later still again) --
+# The client's real Excel Kundli worksheet for the reference chart
+# (1973-10-12, 14:55 IST, Amalsad: lat=20.815615264029468,
+# lon=72.95947488134223). Degrees converted from the sheet's D°M'S" to
+# decimal; nakshatra/pada and the R*/D flags are read straight off the
+# sheet. This is the exact same comparison table from the project doc,
+# now locked in as a permanent regression test.
+
+_REAL_EXCEL_REFERENCE_CHART = BirthMoment(
+    year=1973, month=10, day=12, hour=14, minute=55, second=0,
+    utc_offset_hours=5.5, latitude=20.815615264029468, longitude=72.95947488134223,
+)
+
+# code -> (expected sign, expected degree_in_sign, expected nakshatra, expected pada)
+_EXCEL_EXPECTED = {
+    "Asc": ("Capricorn", 22.8464, "Shravana", 4),
+    "Su":  ("Virgo", 25.4319, "Chitra", 1),
+    "Mo":  ("Pisces", 28.8083, "Revati", 4),
+    "Ma":  ("Aries", 12.2328, "Ashwini", 4),
+    "Me":  ("Libra", 19.1431, "Swati", 4),
+    "Ju":  ("Capricorn", 9.1206, "Uttara Ashadha", 4),
+    "Ve":  ("Scorpio", 9.9769, "Anuradha", 2),
+    "Sa":  ("Gemini", 11.2483, "Ardra", 2),
+    "Ra":  ("Sagittarius", 8.7092, "Mula", 3),
+    "Ke":  ("Gemini", 8.7092, "Ardra", 1),
+    # Uranus/Neptune/Pluto (2026-09-24, yet even later still) -- same
+    # Excel sheet, same reference chart.
+    "Ur":  ("Virgo", 29.6694, "Chitra", 2),
+    "Ne":  ("Scorpio", 12.0275, "Anuradha", 3),
+    "Pl":  ("Virgo", 11.3725, "Hasta", 1),
+}
+
+# Excel's R* (retrograde) flag was present for exactly these three (the
+# sheet showed no flag for Ur/Ne/Pl, matching this engine's own
+# speed-based computation for them -- see the all-planets test below).
+_EXCEL_RETROGRADE_CODES = {"Ma", "Ra", "Ke"}
+
+
+def test_confirmed_ayanamsa_convention_matches_real_excel_data_ascendant():
+    chart = compute_natal_chart(_REAL_EXCEL_REFERENCE_CHART)
+    data = chart_to_dict(chart)
+    asc = data["ascendant"]
+    expected_sign, expected_deg, expected_nak, expected_pada = _EXCEL_EXPECTED["Asc"]
+    assert asc["sign"] == expected_sign
+    assert abs(asc["degree_in_sign"] - expected_deg) < 0.001
+    assert asc["nakshatra"] == expected_nak
+    assert asc["pada"] == expected_pada
+
+
+def test_confirmed_ayanamsa_convention_matches_real_excel_data_all_planets():
+    """Covers all 12 entries /api/chart's `chart_to_dict()` now returns:
+    the 9 classical grahas plus Uranus/Neptune/Pluto (2026-09-24, yet even
+    later still)."""
+    chart = compute_natal_chart(_REAL_EXCEL_REFERENCE_CHART)
+    data = chart_to_dict(chart)
+    assert {p["code"] for p in data["planets"]} == {
+        "Su", "Mo", "Ma", "Me", "Ju", "Ve", "Sa", "Ra", "Ke", "Ur", "Ne", "Pl",
+    }
+    for p in data["planets"]:
+        expected_sign, expected_deg, expected_nak, expected_pada = _EXCEL_EXPECTED[p["code"]]
+        assert p["sign"] == expected_sign, f"{p['code']}: sign"
+        assert abs(p["degree_in_sign"] - expected_deg) < 0.001, f"{p['code']}: degree_in_sign"
+        assert p["nakshatra"] == expected_nak, f"{p['code']}: nakshatra"
+        assert p["pada"] == expected_pada, f"{p['code']}: pada"
+        assert p["retrograde"] == (p["code"] in _EXCEL_RETROGRADE_CODES), f"{p['code']}: retrograde"

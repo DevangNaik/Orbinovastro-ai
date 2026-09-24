@@ -459,12 +459,13 @@ NOT to drop just because this particular example doesn't show them:
    use plain white boxes with no sign label at all — that's simply how
    that third-party tool renders it, not an instruction to remove either
    feature from this build. Both stay exactly as already specified.
-5. **Do NOT add Uranus/Neptune/Pluto rows or wheel labels.** The reference
-   image happens to include them (that tool computes all 12 bodies), but
-   this engine still only returns the 9 classical grahas + Ascendant —
-   see the still-open scope note in the "Planet color scheme and the
-   enriched Planet Details Table" section below. Don't render placeholder
-   labels for the three outer planets in the wheel either.
+5. ~~Do NOT add Uranus/Neptune/Pluto rows or wheel labels.~~
+   **SUPERSEDED (2026-09-24, yet even later still): DO add them now** —
+   see the UPDATE box at the top of the "Planet color scheme and the
+   enriched Planet Details Table" section below. `/api/chart` now returns
+   real position data for all three, so the wheel diagram should draw
+   them in their correct house box, same label format as any other
+   planet, with their own accent colors.
 
 **Which sign goes in which box, per chart type:**
 - **D1**: whole-sign houses starting from the ascendant's own sign. In
@@ -494,6 +495,40 @@ NOT to drop just because this particular example doesn't show them:
   the cusp positions themselves.
 
 ## Planet color scheme and the enriched Planet Details Table (updated, 2026-09-24 later still)
+
+**UPDATE (2026-09-24, yet even later still):** three more changes, all
+server-side already, nothing structural for Codex to redesign:
+
+1. **The numbers themselves shifted slightly.** `/api/chart` switched its
+   ayanamsa/node convention to match the client's real Excel data exactly
+   (previously an unconfirmed stand-in) -- expect every planet's degree to
+   move by roughly 5 arcminutes (0.08°) from whatever was live before, and
+   Rahu/Ketu specifically by close to a degree. This can occasionally flip
+   a planet into a different nakshatra/pada or house near a boundary. No
+   frontend change needed -- just don't be alarmed if a QA pass shows
+   slightly different numbers than an earlier screenshot; the new ones are
+   the correct ones now.
+2. **New field: `functional_nature`.** A SEPARATE Benefic/Malefic
+   classification from `nature` -- chart-specific (depends on which
+   houses a planet rules from the CURRENT ascendant, not a fixed
+   per-planet fact), labeled BETA. Render it as a second small badge next
+   to the existing Nature badge on the fourth line of the "Planet /
+   Position" cell, e.g. `Malefic · Functional: Benefic · Retrograde` --
+   don't merge the two into one badge, since they can (and for this
+   engagement's own reference chart, do) disagree for the same planet.
+   `null` for Rahu/Ketu and for Uranus/Neptune/Pluto (see point 3) --
+   dash, not a missing badge.
+3. **Uranus, Neptune, and Pluto now appear as three more rows.** The
+   earlier guidance below saying not to add them is superseded -- ignore
+   point 6 and the color-scheme note about them further down, both left
+   in place but now out of date on this one point rather than rewritten
+   line by line. They get real `degree_in_sign`/`nakshatra`/`pada`/
+   `meaning`/`flags`/`house`/`rasi_house` like any planet, but a dash for
+   `nature`, `functional_nature`, `conjunctions`, `aspects`, and
+   `aspected_by` -- classical Parashari conjunctions/aspects and
+   benefic/malefic groupings are graha-only concepts that don't extend to
+   the outer planets. Give each of the three its own accent color too,
+   same as the classical nine.
 
 **UPDATE (2026-09-24, later still again):** the client used the live
 page and refined this feedback further, twice more -- the version below
@@ -584,12 +619,12 @@ match:
    of its own; use a dash for those specific lines only (Nature/Flags'
    nature half, Conjunctions, and Aspects -- but NOT Aspected By, which is
    real for the Ascendant).
-6. **Uranus / Neptune / Pluto are intentionally still not in this table.**
-   `/api/chart` computes only the 9 classical grahas + Ascendant -- adding
-   the three outer planets is real new engineering scope (new ephemeris
-   calls, plus a genuine question of whether they belong in a Vedic/KP
-   chart at all, since traditional practice doesn't use them) that hasn't
-   been decided yet. Don't add placeholder/blank rows for them.
+6. ~~Uranus / Neptune / Pluto are intentionally still not in this
+   table.~~ **SUPERSEDED (see the UPDATE box at the top of this section):
+   they're in now.** `/api/chart`'s `planets` array has 12 entries, not 9
+   -- the classical 9 grahas plus Ur/Ne/Pl, each with real position data
+   but a dash for Nature/Functional Nature/Conjunctions/Aspects/Aspected
+   By.
 7. **Which field feeds the "Sign · House" line under each chart tab** --
    same house-field rule the wheel diagrams themselves already use, now
    also driving this table: `rasi_house` for D1, `house` for Bhava Chalit,
@@ -657,15 +692,25 @@ down for the full shape):
   is empty. The Ascendant entry has a real `aspected_by` (planets can
   aspect the 1st house/Lagna) but no `aspects` key at all — it never
   casts one, use a dash for that specific line only.
-- `nature` — `"Malefic"` or `"Benefic"`. Renders on the fourth line of the
-  "Planet / Position" cell, alongside flags (see the UPDATE box's point 1
-  above). Not present on the Ascendant entry either, for the same reason
-  as `conjunctions` — use a dash there. Tint it consistently with the
-  Flags badges (see the existing "Retrograde and beta markers should be
+- `nature` — `"Malefic"` or `"Benefic"`, or an empty string for Uranus/
+  Neptune/Pluto (dash). Renders on the fourth line of the "Planet /
+  Position" cell, alongside flags (see the UPDATE box's point 1 above).
+  Not present on the Ascendant entry either, for the same reason as
+  `conjunctions` — use a dash there. Tint it consistently with the Flags
+  badges (see the existing "Retrograde and beta markers should be
   visually distinct" guidance below).
+- `functional_nature` — **new**, `"Malefic"` / `"Benefic"` / `null`. A
+  SEPARATE, chart-specific classification from `nature` (see the UPDATE
+  box at the top of this section) -- based on which houses this planet
+  RULES from the current ascendant, not a fixed per-planet fact, so it
+  can (and does, for real charts) disagree with `nature`. `null` for
+  Rahu/Ketu and for Uranus/Neptune/Pluto — dash. Render as its own small
+  badge right next to the Nature badge, labeled distinctly (e.g.
+  "Functional: Benefic"), never merged into one badge with `nature`.
 
-**A single planet-details table, one row per planet** (Ascendant + 9
-planets, same order as `/api/chart`'s `planets` array), exactly three
+**A single planet-details table, one row per planet** (Ascendant + 12
+planets — the classical 9 grahas plus Uranus/Neptune/Pluto — same order
+as `/api/chart`'s `planets` array), exactly three
 columns — see the UPDATE box at the top of this section for the full,
 final spec: **"Planet / Position"** (Planet name; Sign · House for the
 current tab; Degree · Nakshatra(Pada); Nature · Flags, each on its own
@@ -691,10 +736,9 @@ orbinovastro.com's own palette (don't import the Excel screenshot's exact
 hex values verbatim — those were tuned for a white Excel grid, not this
 site's theme) but keep the same STRUCTURE the client's reference uses:
 - A distinct hue per body: Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn,
-  Rahu, and Ketu each get their own color, consistent across every place
-  they're rendered on the page. (If the D9/Cuspal views also show Uranus/
-  Neptune/Pluto — they don't currently, `/api/chart` only returns the 9
-  classical grahas plus Ascendant — skip this for now.)
+  Rahu, Ketu, Uranus, Neptune, and Pluto (twelve total now — see the
+  UPDATE box at the top of the previous section) each get their own
+  color, consistent across every place they're rendered on the page.
 - A light background tint per house box keyed to that box's sign's
   classical element (fire: Aries/Leo/Sagittarius, earth: Taurus/Virgo/
   Capricorn, air: Gemini/Libra/Aquarius, water: Cancer/Scorpio/Pisces) —
@@ -802,7 +846,7 @@ Response (`ChartOut`):
 ```json
 {
   "name": "", "place": "",
-  "ayanamsa_deg": 23.94, "ayanamsa_mode": "Krishnamurti (KP)",
+  "ayanamsa_deg": 23.94, "ayanamsa_mode": "Krishnamurti VP291 + confirmed diff",
   "ascendant": {
     "house": 1, "longitude": 294.8, "sign": "Capricorn", "sign_lord": "Sa",
     "degree_in_sign": 24.8, "nakshatra": "Dhanishta", "nakshatra_lord": "Ma", "pada": 3,
@@ -820,12 +864,24 @@ Response (`ChartOut`):
       "meaning": "Chitra(1): craftsmanship and a natural sense of design or charisma; Virgo adds careful and detail-driven.",
       "conjunctions": [{"code": "Me", "orb_degrees": 4.19}],
       "nature": "Benefic",
+      "functional_nature": "Malefic",
       "flags": [],
       "aspects": [{"code": "Ju", "aspect": "9th"}],
       "aspected_by": [{"code": "Ma", "aspect": "7th"}]
     },
-    "... 9 planets total: Su, Mo, Ma, Me, Ju, Ve, Sa, Ra, Ke — a planet in its sign of",
-    "... debilitation would instead show e.g. \"flags\": [\"Debilitated\"]"
+    "... 9 classical grahas total: Su, Mo, Ma, Me, Ju, Ve, Sa, Ra, Ke — a planet in its",
+    "... sign of debilitation would instead show e.g. \"flags\": [\"Debilitated\"]",
+    {
+      "code": "Ur", "name": "Uranus", "longitude": 179.669,
+      "sign": "Virgo", "sign_lord": "Me", "degree_in_sign": 29.669,
+      "nakshatra": "Chitra", "nakshatra_lord": "Ma", "pada": 2,
+      "retrograde": false, "house": 8, "rasi_house": 9,
+      "meaning": "Chitra(2): craftsmanship and a natural sense of design or charisma; Virgo adds careful and detail-driven.",
+      "conjunctions": [], "nature": "", "functional_nature": null,
+      "flags": [], "aspects": [], "aspected_by": []
+    },
+    "... plus Ne, Pl the same shape — real position/meaning/flags, dash",
+    "... (empty/null) for nature/functional_nature/conjunctions/aspects/aspected_by"
   ],
   "disclaimer": "Mechanical-layer chart only: ... (show this to the user)"
 }
@@ -850,7 +906,15 @@ Debilitated/Own Sign — only `"Vargottama"` or empty, since it isn't a
 planet. **`aspects`/`aspected_by` are new (2026-09-24, later still
 again)** — classical Parashari whole-sign graha drishti, see the same
 section above for the full rule and rendering guidance; the Ascendant has
-`aspected_by` but no `aspects` key.
+`aspected_by` but no `aspects` key. Rahu and Ketu never appear in each
+other's `aspects`/`aspected_by` even though they're always exactly
+opposite signs by definition — that's a deliberate carve-out (client
+feedback), not a bug.
+
+**`functional_nature` and Uranus/Neptune/Pluto are both new (2026-09-24,
+yet even later still)** — see the UPDATE box at the top of the "Planet
+color scheme and the enriched Planet Details Table" section above for
+the full rendering guidance for both.
 
 ### `POST /api/navamsa` (BETA)
 D9 Navamsa divisional chart — standard textbook formula (movable/fixed/dual
@@ -1189,9 +1253,17 @@ something Codex needs to handle.
    (e) the Sign/House line actually changes when you switch tabs (D1 →
    Bhava Chalit → D9 → Cuspal) while Degree/Nakshatra/Meaning/Conjunctions/
    Aspects/Aspected By stay the same for that planet, since those are
-   natal facts, not per-view ones; (f) no Uranus/Neptune/Pluto rows appear
-   anywhere, in the wheel or the table (see point 6 in the update box
-   above — that's still out of scope, not a bug to fix here).
+   natal facts, not per-view ones; (f) Uranus, Neptune, and Pluto now
+   DO appear, both in the wheel (correct house box, own accent color) and
+   as three more table rows, each with real position/Meaning/Flags but a
+   dash for Nature, Functional Nature, Conjunctions, Aspects, and Aspected
+   By (see the "yet even later still" UPDATE box above — this is now the
+   expected behavior, not a bug); (g) each row's `functional_nature`
+   renders as its own small badge next to `nature`, and for at least one
+   planet the two badges show DIFFERENT values (e.g. this engagement's
+   real reference chart has Jupiter as natural Benefic but functional
+   Malefic) — if they always match, functional_nature likely isn't wired
+   up, it's silently mirroring nature instead.
 4. Compute KP significators for the same birth details — the "beta" label
    must be visible.
 5. Try the transit view with no date (defaults to now) and with a specific

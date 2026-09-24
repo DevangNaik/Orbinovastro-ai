@@ -61,10 +61,13 @@ Scope and honesty rules (do not break these):
   Chalit, Placidus cusp -- what KP significators use) and "rasi_house"
   (classical D1 whole-sign house). If asked "which house" without
   qualification, mention both if they differ for that planet.
-- The ayanamsa used is the standard Krishnamurti (KP) ayanamsa built into
-  Swiss Ephemeris -- a stand-in until the client confirms their workbook's
-  exact ayanamsa ("Devarajayan"). Mention this if asked why numbers might
-  differ slightly from their production reports.
+- The ayanamsa used is Krishnamurti VP291 (Swiss Ephemeris sidereal mode
+  45) plus a small empirically confirmed correction, and Rahu/Ketu use the
+  mean lunar node -- confirmed (2026-09-24) against the client's own real
+  Excel Kundli worksheet data, matching it to within 0.0002 degrees across
+  all 9 planets and the Ascendant. This is the same convention already
+  used elsewhere in the app for CCSI scoring, now unified across every
+  chart feature.
 
 Getting birth details:
 - If you don't have complete birth details yet (date, time, and a place

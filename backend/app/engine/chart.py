@@ -58,12 +58,41 @@ standard; Lagna itself never casts an aspect, so it has no `aspects` key
 of its own -- consistent with how it already has no `conjunctions`/
 `nature`). Deliberately distinct from `conjunctions` (same-sign proximity)
 and from hit_calc.py's own Western-angle aspect classification used for
-CCSI stress scoring -- see chart_narrative.py's own docstring."""
+CCSI stress scoring -- see chart_narrative.py's own docstring.
+
+UPDATE (2026-09-24, even later still): switched to the CCSI-confirmed
+ayanamsa/node convention (see ephemeris.py's own docstring) and added
+`functional_nature` to every planet -- a new, chart-specific (house-
+lordship based) Benefic/Malefic classification, client-requested,
+deliberately SEPARATE from the existing fixed `nature` field (which stays
+untouched, since it's load-bearing for hit_calc.py's validated CCSI
+scoring). None for Rahu/Ketu (the lunar nodes rule no sign, so this
+lordship-based rule has nothing to apply to them -- see
+chart_narrative.py's own comment for why this is a deliberate omission,
+not an oversight). BETA: a standard classical textbook rule, validated
+against the client's real Excel data for the 7 rasi-ruling grahas, not
+yet confirmed as the client's own workbook formula.
+
+UPDATE (2026-09-24, yet even later still): added Uranus/Neptune/Pluto to
+the `planets` list -- client-requested, real Swiss Ephemeris positions
+(via `ephemeris.compute_outer_planets`), validated against the client's
+real Excel data (all 3 matched to within 0.0001 degrees, same nakshatra/
+pada). They get `house`/`rasi_house`/`meaning`/`flags` computed exactly
+like any classical graha, but empty `conjunctions`/`aspects`/
+`aspected_by` and no `nature`/`functional_nature` -- classical Parashari
+conjunctions and graha-drishti are a graha-only concept, and the outer
+planets have no classical natural-benefic/malefic assignment and rule no
+sign. Deliberately kept OUT of `ephemeris.compute_natal_chart`'s own
+9-planet `chart.planets` list and out of a SEPARATE `chart.outer_planets`
+field instead, so every classical-9-planet-only consumer of
+`compute_natal_chart` (teaser.py, kp.py significators, varga.py D9,
+ccsi.py/hit_calc.py CCSI scoring, dasha.py) is completely unaffected --
+only this function merges them into the /api/chart response."""
 from __future__ import annotations
 
 from .chart_narrative import (
-    aspected_by_for_point, is_vargottama, natal_aspects, natal_conjunctions,
-    planet_flags, planet_nature, position_meaning,
+    aspected_by_for_point, functional_nature, is_vargottama, natal_aspects,
+    natal_conjunctions, planet_flags, planet_nature, position_meaning,
 )
 from .ephemeris import (
     BirthMoment, NatalChart, compute_natal_chart, nakshatra_for_longitude,
@@ -147,6 +176,7 @@ def chart_to_dict(chart: NatalChart) -> dict:
                 "meaning": position_meaning(p.sign, p.nakshatra, p.pada),
                 "conjunctions": conjunctions_by_code[p.code],
                 "nature": planet_nature(p.code),
+                "functional_nature": functional_nature(p.code, asc_sign_index),
                 "flags": planet_flags(
                     p.code, p.sign, p.longitude, p.retrograde, sun_longitude
                 ),
@@ -154,5 +184,39 @@ def chart_to_dict(chart: NatalChart) -> dict:
                 "aspected_by": aspects_by_code[p.code]["aspected_by"],
             }
             for p in chart.planets
+        ] + [
+            {
+                "code": p.code,
+                "name": p.name,
+                "longitude": round(p.longitude, 3),
+                "sign": p.sign,
+                "sign_lord": p.sign_lord,
+                "degree_in_sign": round(p.degree_in_sign, 3),
+                "nakshatra": p.nakshatra,
+                "nakshatra_lord": p.nakshatra_lord,
+                "pada": p.pada,
+                "retrograde": p.retrograde,
+                "house": house_of_longitude(p.longitude, cusp_longitudes),
+                "rasi_house": whole_sign_house(
+                    sign_index_for_longitude(p.longitude), asc_sign_index
+                ),
+                "meaning": position_meaning(p.sign, p.nakshatra, p.pada),
+                # Uranus/Neptune/Pluto: no conjunctions/aspects (classical
+                # Parashari drishti is a graha-only concept -- see
+                # ephemeris.py's OUTER_PLANET_IDS comment) and no nature/
+                # functional_nature (no classical natural-benefic/malefic
+                # assignment for the outer planets, and they rule no sign
+                # so there's no house-lordship to base a functional
+                # reading on either).
+                "conjunctions": [],
+                "nature": "",
+                "functional_nature": None,
+                "flags": planet_flags(
+                    p.code, p.sign, p.longitude, p.retrograde, sun_longitude
+                ),
+                "aspects": [],
+                "aspected_by": [],
+            }
+            for p in chart.outer_planets
         ],
     }

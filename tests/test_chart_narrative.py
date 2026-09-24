@@ -14,9 +14,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 from app.engine.chart import chart_to_dict
 from app.engine.chart_narrative import (
     BENEFIC_PLANETS, MALEFIC_PLANETS, NAKSHATRA_THEMES, SIGN_TRAITS,
-    angular_separation, aspected_by_for_point, dignity_flag, is_vargottama,
-    natal_aspects, natal_conjunctions, planet_flags, planet_nature,
-    position_meaning,
+    angular_separation, aspected_by_for_point, dignity_flag,
+    functional_nature, houses_ruled_by, is_vargottama, natal_aspects,
+    natal_conjunctions, planet_flags, planet_nature, position_meaning,
 )
 from app.engine.ephemeris import (
     BirthMoment, compute_natal_chart, sign_index_for_longitude,
@@ -111,7 +111,12 @@ def test_chart_to_dict_wires_nature_for_every_planet():
     chart = _reference_chart()
     data = chart_to_dict(chart)
     for p in data["planets"]:
-        assert p["nature"] in ("Malefic", "Benefic")
+        if p["code"] in ("Ur", "Ne", "Pl"):
+            # Outer planets have no classical natural benefic/malefic
+            # assignment -- see chart.py's own docstring.
+            assert p["nature"] == ""
+        else:
+            assert p["nature"] in ("Malefic", "Benefic")
 
 
 # --- 2026-09-24, later still: Ascendant nakshatra/pada/meaning gap and the
@@ -181,8 +186,13 @@ def test_chart_to_dict_flags_match_teasers_flags_for_the_same_chart():
     data = chart_to_dict(chart)
     teaser = build_teaser(chart)
 
-    chart_flags_by_code = {p["code"]: set(p["flags"]) for p in data["planets"]}
+    # /api/chart also carries Uranus/Neptune/Pluto (teaser.py doesn't --
+    # see chart.py's own docstring), so compare only the 9 classical
+    # grahas both sides actually have an opinion on.
     teaser_flags_by_code = {p.code: set(p.flags) for p in teaser.placements if p.code != "Asc"}
+    chart_flags_by_code = {
+        p["code"]: set(p["flags"]) for p in data["planets"] if p["code"] in teaser_flags_by_code
+    }
 
     assert chart_flags_by_code == teaser_flags_by_code
     assert "Debilitated" in chart_flags_by_code["Ju"]
@@ -279,6 +289,23 @@ def test_natal_aspects_no_planet_ever_aspects_itself():
         assert code not in {a["code"] for a in data["aspected_by"]}
 
 
+def test_natal_aspects_rahu_and_ketu_never_aspect_each_other():
+    """Client feedback (2026-09-24): Rahu and Ketu are always exactly 180
+    degrees apart by definition (Ketu = Rahu + 180), so they are always in
+    each other's 7th sign -- but that's a structural fact of how the lunar
+    nodes work, not a real classical aspect relationship, and the client's
+    own convention doesn't count it as one. Confirmed on the real
+    reference chart, where Ra (Sagittarius) and Ke (Gemini) genuinely ARE
+    opposite signs, so without the carve-out this would otherwise show up
+    as a (false) mutual 7th aspect."""
+    chart = _real_client_reference_chart()
+    aspects = natal_aspects(chart.planets)
+    ra_codes = {a["code"] for a in aspects["Ra"]["aspects"]} | {a["code"] for a in aspects["Ra"]["aspected_by"]}
+    ke_codes = {a["code"] for a in aspects["Ke"]["aspects"]} | {a["code"] for a in aspects["Ke"]["aspected_by"]}
+    assert "Ke" not in ra_codes
+    assert "Ra" not in ke_codes
+
+
 def test_aspected_by_for_point_finds_a_planet_aspecting_the_ascendant():
     """A synthetic case rather than relying on the real chart happening to
     have a hit on the Ascendant: place a fake Ascendant longitude exactly
@@ -302,3 +329,86 @@ def test_chart_to_dict_wires_aspects_for_every_planet_and_ascendant():
     asc = data["ascendant"]
     assert "aspected_by" in asc
     assert "aspects" not in asc  # Lagna never casts an aspect of its own
+
+
+# --- Functional (house-lordship) benefic/malefic (2026-09-24, even later
+# still) ---------------------------------------------------------------
+
+def test_houses_ruled_by_saturn_for_taurus_ascendant_is_the_classic_yogakaraka():
+    """Independent sanity check, not tied to the real reference chart:
+    Saturn ruling both the 9th (trikona) and 10th (kendra) from a Taurus
+    ascendant is a famous, textbook-standard yogakaraka fact -- if this
+    doesn't come out right, the house-lordship math itself is wrong."""
+    taurus_index = 1  # Aries=0, Taurus=1
+    assert houses_ruled_by("Sa", taurus_index) == {9, 10}
+    assert functional_nature("Sa", taurus_index) == "Benefic"
+
+
+def test_functional_nature_matches_the_real_reference_chart_excel_data():
+    """The client's real Excel 'Nature' column disagrees with the fixed
+    natural classification for exactly 4 of 9 planets (Su, Ju, Sa, Ra) --
+    functional_nature() reproduces all 3 of the non-node flips exactly for
+    this chart's Capricorn ascendant, and leaves the 4th (Ra, a lunar
+    node with no house lordship) deliberately unclassified rather than
+    guessed. See ayanamsa-and-nature-findings-2026-09-24.md (project doc)
+    for the full comparison and the classical reasoning behind each one."""
+    chart = _real_client_reference_chart()
+    asc_index = sign_index_for_longitude(chart.ascendant.longitude)
+    expected = {
+        "Su": "Malefic",   # rules only the 8th (dusthana) -- no kendra/trikona
+        "Mo": "Benefic",   # rules only the 7th (kendra-only) -- keeps natural
+        "Ma": "Malefic",   # rules 4th (kendra-only) + 11th -- keeps natural
+        "Me": "Benefic",   # rules 6th + 9th (trikona) -- keeps natural
+        "Ju": "Malefic",   # rules only 3rd + 12th -- no kendra/trikona
+        "Ve": "Benefic",   # rules 5th (trikona) + 10th (kendra) -- yogakaraka
+        "Sa": "Benefic",   # rules the 1st (Lagna) -- always auspicious
+    }
+    for code, expected_nature in expected.items():
+        assert functional_nature(code, asc_index) == expected_nature, code
+    # Rahu/Ketu deliberately left unclassified, not guessed.
+    assert functional_nature("Ra", asc_index) is None
+    assert functional_nature("Ke", asc_index) is None
+
+
+def test_functional_nature_differs_from_natural_for_the_known_flips():
+    chart = _real_client_reference_chart()
+    asc_index = sign_index_for_longitude(chart.ascendant.longitude)
+    for code in ("Su", "Ju", "Sa"):
+        assert functional_nature(code, asc_index) != planet_nature(code)
+
+
+def test_functional_nature_lagna_lord_is_always_benefic_even_if_naturally_malefic():
+    """Generic rule check across all 12 possible ascendants: whichever
+    planet rules the 1st house is always functionally Benefic, regardless
+    of whether it's a natural malefic (e.g. Saturn/Mars ruling their own
+    ascendant sign)."""
+    for asc_index in range(12):
+        for code in ("Su", "Mo", "Ma", "Me", "Ju", "Ve", "Sa"):
+            if 1 in houses_ruled_by(code, asc_index):
+                assert functional_nature(code, asc_index) == "Benefic"
+
+
+def test_chart_to_dict_outer_planets_have_empty_conjunctions_and_aspects():
+    """Classical Parashari conjunctions/graha-drishti are a graha-only
+    concept -- Uranus/Neptune/Pluto never participate, even though they
+    get houses/rasi_house/meaning/flags like any other planet."""
+    chart = _real_client_reference_chart()
+    data = chart_to_dict(chart)
+    for p in data["planets"]:
+        if p["code"] in ("Ur", "Ne", "Pl"):
+            assert p["conjunctions"] == []
+            assert p["aspects"] == []
+            assert p["aspected_by"] == []
+            assert p["meaning"]  # still gets a real meaning sentence
+            assert 1 <= p["rasi_house"] <= 12
+
+
+def test_chart_to_dict_wires_functional_nature_for_every_planet():
+    chart = _real_client_reference_chart()
+    data = chart_to_dict(chart)
+    for p in data["planets"]:
+        assert "functional_nature" in p
+        if p["code"] in ("Ra", "Ke", "Ur", "Ne", "Pl"):
+            assert p["functional_nature"] is None
+        else:
+            assert p["functional_nature"] in ("Benefic", "Malefic")

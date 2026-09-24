@@ -67,6 +67,15 @@ class PlanetOut(BaseModel):
         description="'Malefic' or 'Benefic' -- standard classical grouping (Sa/Ma/Ra/Ke vs. "
         "Su/Me/Mo/Ju/Ve), the same one this engine's CCSI weighting already uses internally."
     )
+    functional_nature: str | None = Field(
+        default=None,
+        description="'Malefic' / 'Benefic' / null -- a SEPARATE, chart-specific classification "
+        "based on which houses this planet rules from the current ascendant (standard "
+        "kendra/trikona/dusthana lordship rule), NOT the same as `nature` above (which is "
+        "fixed and never changes chart to chart). Null for Rahu/Ketu, which rule no sign. "
+        "BETA: standard classical textbook rule, not yet confirmed as the client's own "
+        "workbook formula."
+    )
     flags: list[str] = Field(
         default_factory=list,
         description="Zero or more of 'Retrograde' / 'Combust' / 'Exalted' / 'Debilitated' / "
@@ -133,14 +142,20 @@ class ChartOut(BaseModel):
     disclaimer: str = (
         "Mechanical-layer chart only, all positions Nirayana (sidereal): "
         "planetary/house positions computed via Swiss Ephemeris "
-        "(Krishnamurti ayanamsa, standard stand-in pending client "
-        "confirmation of the workbook's exact ayanamsa). Each planet's "
+        "(Krishnamurti VP291 ayanamsa plus a confirmed correction, mean "
+        "lunar node for Rahu/Ketu -- validated 2026-09-24 against the "
+        "client's real Excel Kundli worksheet data to within 0.0002 "
+        "degrees across all 9 planets and the Ascendant). Each planet's "
         "'house' is Bhava Chalit (Placidus cusp); 'rasi_house' is the "
         "classical D1 whole-sign house. Does NOT include KP significators "
         "(see /api/kp-beta), the D9 Navamsa divisional chart (see "
         "/api/navamsa, also beta), divisional charts beyond D1/D9, "
         "dasha/bhukti selection, or connection-scoring -- those parts of "
-        "the engine are not yet ported/validated."
+        "the engine are not yet ported/validated. Each planet's "
+        "'functional_nature' is a separate, chart-specific BETA "
+        "classification (standard kendra/trikona/dusthana house-lordship "
+        "rule) -- distinct from 'nature', which is fixed and never "
+        "changes chart to chart."
     )
 
 

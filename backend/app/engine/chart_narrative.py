@@ -40,7 +40,7 @@ correctly, a few tabs over, off the same underlying chart data.
 features can no longer silently drift apart the way they just did."""
 from __future__ import annotations
 
-from .ephemeris import sign_index_for_longitude
+from .ephemeris import RASHI_LORD, sign_index_for_longitude
 from .varga import navamsa_sign_index
 
 # Short, plain, sign-based color -- standard astrology, not proprietary,
@@ -270,7 +270,17 @@ def natal_aspects(planets: list) -> dict:
     3rd/10th relationship isn't its own mirror the way opposition (7th) is.
     Only the universal 7th aspect is always mutual. For a non-graha point
     like the Ascendant, see `aspected_by_for_point` below -- it can be
-    aspected but never casts one of its own."""
+    aspected but never casts one of its own.
+
+    Rahu/Ketu carve-out (client feedback, 2026-09-24): Rahu and Ketu are
+    ALWAYS exactly 180 degrees apart by definition (Ketu = Rahu + 180),
+    which means they are always in each other's 7th sign -- but that's a
+    structural fact of how the lunar nodes work, not a real classical
+    graha-drishti relationship between two planets, and the client's own
+    convention does not count it as one. So Ra never appears in Ke's
+    `aspects`/`aspected_by` and vice versa, even though the universal 7th
+    aspect otherwise applies to every graha including the nodes (see the
+    comment above `_UNIVERSAL_ASPECT_DISTANCE`)."""
     sign_index = {p.code: sign_index_for_longitude(p.longitude) for p in planets}
     result: dict[str, dict[str, list]] = {
         p.code: {"aspects": [], "aspected_by": []} for p in planets
@@ -279,6 +289,8 @@ def natal_aspects(planets: list) -> dict:
         p_distances = _aspect_distances_for(p.code)
         for q in planets:
             if q.code == p.code:
+                continue
+            if {p.code, q.code} == {"Ra", "Ke"}:
                 continue
             dist = _house_distance(sign_index[p.code], sign_index[q.code])
             if dist in p_distances:
@@ -302,6 +314,88 @@ def aspected_by_for_point(point_longitude: float, planets: list) -> list:
         if dist in _aspect_distances_for(p.code):
             hits.append({"code": p.code, "aspect": _ASPECT_ORDINALS[dist]})
     return hits
+
+
+# Functional (chart-specific, house-lordship based) benefic/malefic --
+# NEW (2026-09-24, later still again), client-requested, deliberately
+# SEPARATE from `planet_nature()`/`MALEFIC_PLANETS`/`BENEFIC_PLANETS`
+# above, which must stay untouched: those are the fixed NATURAL
+# classification shared with, and load-bearing for, hit_calc.py's own
+# already-validated (132/132 real cells) CCSI stress-weighting -- this is
+# a genuinely different, chart-specific concept (which houses a planet
+# RULES from a given ascendant), not a replacement for it.
+#
+# Standard classical kendra(1,4,7,10)/trikona(1,5,9)/dusthana(6,8,12)
+# house-lordship rule, in this fixed order:
+#   1. Rules the 1st (Lagna) -> functionally Benefic. Classical rule: the
+#      Ascendant lord is always auspicious for that ascendant, regardless
+#      of its natural character.
+#   2. Rules a kendra AND a trikona house (not necessarily the 1st) ->
+#      functionally Benefic ("yogakaraka" -- the strongest classical
+#      benefic combination).
+#   3. Rules NEITHER a kendra NOR a trikona house (e.g. only the 3rd/12th,
+#      or only the 6th/8th/12th) -> functionally Malefic, regardless of
+#      natural character.
+#   4. Otherwise (rules a kendra only, or a trikona only, with no 1st/
+#      yogakaraka combination) -> falls back to the NATURAL classification
+#      unchanged. This isn't a simplification of convenience -- it's the
+#      case hand-verified against the client's own real Excel data: the
+#      Moon (kendra-only lord, naturally Benefic) stayed functionally
+#      Benefic, and Mars (kendra-only lord, naturally Malefic) stayed
+#      functionally Malefic, for the real reference chart's Capricorn
+#      ascendant. A "kendradhipatya dosha" penalty some texts apply to a
+#      natural benefic owning only a kendra was deliberately NOT added --
+#      it did not match the real data point available to check it against.
+#
+# VALIDATED against the client's real Excel "Nature" column for the real
+# reference chart (Capricorn ascendant): all 4 disagreements between the
+# client's data and the natural classification (Su, Ju, Sa functionally
+# flip; see below) are exactly reproduced by this rule -- see project doc
+# ayanamsa-and-nature-findings-2026-09-24.md for the full comparison.
+#
+# Rahu/Ketu are DELIBERATELY EXCLUDED (return None, not guessed) -- the
+# lunar nodes rule no sign, so this lordship rule has nothing to apply to
+# them, and no standard textbook shortcut (dispositor-based, house-based,
+# etc.) reproduced the client's real data for the nodes specifically (the
+# real chart's Excel data has Ra=Benefic, Ke=Malefic; a dispositor-based
+# guess would have predicted the opposite). Guessing wrong here would be
+# worse than omitting -- see this module's standing "don't guess
+# proprietary/classical conventions" discipline. BETA: standard classical
+# textbook rule, not yet confirmed as the client's own workbook formula.
+FUNCTIONAL_KENDRA_HOUSES = {1, 4, 7, 10}
+FUNCTIONAL_TRIKONA_HOUSES = {1, 5, 9}
+
+
+def houses_ruled_by(code: str, ascendant_sign_index: int) -> set[int]:
+    """Which of the 12 whole-sign houses (1-12, counted from the given
+    ascendant sign) this planet rules, for the classical 7 rasi-ruling
+    grahas (Su/Mo/Ma/Me/Ju/Ve/Sa -- Rahu/Ketu rule no sign, always empty).
+    Mo/Su each rule exactly one sign (Cancer/Leo) so at most one house;
+    the other 5 rule two signs each so at most two houses."""
+    return {
+        house for house in range(1, 13)
+        if RASHI_LORD[(ascendant_sign_index + house - 1) % 12] == code
+    }
+
+
+def functional_nature(code: str, ascendant_sign_index: int) -> str | None:
+    """'Benefic' / 'Malefic' / None (Rahu/Ketu, or -- shouldn't happen for
+    a real chart -- a code that rules no sign at all). See the module-level
+    comment above this function for the full rule and its validation."""
+    if code in ("Ra", "Ke"):
+        return None
+    houses_ruled = houses_ruled_by(code, ascendant_sign_index)
+    if not houses_ruled:
+        return None
+    if 1 in houses_ruled:
+        return "Benefic"
+    has_kendra = bool(houses_ruled & FUNCTIONAL_KENDRA_HOUSES)
+    has_trikona = bool(houses_ruled & FUNCTIONAL_TRIKONA_HOUSES)
+    if has_kendra and has_trikona:
+        return "Benefic"
+    if not has_kendra and not has_trikona:
+        return "Malefic"
+    return planet_nature(code)
 
 
 def natal_conjunctions(planets: list) -> dict:
