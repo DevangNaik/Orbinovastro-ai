@@ -697,11 +697,25 @@ BIRTH_DETAIL_FIELDS = [
 # a second field group shown on the same Client Information page, below
 # birth details. See generate_overview_report.py's TRANSIT_DETAIL_NAMED_RANGES
 # for the (assumed, not yet client-confirmed) named-range convention.
+#
+# 2026-09-24, later still: "Update Transit information properly with the
+# location, date and time. End user doesn't care about UTC show them
+# Localtime and UTC time both" -- the client caught a real generated PDF
+# showing "Transit Place: Not available" and an unlabeled UTC time/offset
+# that looked like a bug (it was: the transit engine always computes in
+# UTC internally, but that was being shown to the end user as-is with no
+# explanation). Restructured this from one ambiguous Date/Time/Timezone
+# trio into separate Local and UTC rows, both explicitly labeled, plus a
+# Transit Location row that's never left blank (see
+# `overview_report_builder._transit_details_dict` for how these are
+# computed -- this list only says WHICH fields to render, not how).
 TRANSIT_DETAIL_FIELDS = [
-    ("transit_date", "Transit Date"),
-    ("transit_time", "Transit Time"),
-    ("transit_place", "Transit Place"),
-    ("transit_timezone", "Transit Timezone"),
+    ("transit_date_local", "Transit Date (Local)"),
+    ("transit_time_local", "Transit Time (Local)"),
+    ("transit_place", "Transit Location"),
+    ("transit_timezone_local", "Transit Timezone (Local)"),
+    ("transit_date_utc", "Transit Date (UTC)"),
+    ("transit_time_utc", "Transit Time (UTC)"),
 ]
 
 CLIENT_INFO_TITLE_STYLE = ParagraphStyle("ClientInfoTitle", fontName="Helvetica-Bold", fontSize=20,

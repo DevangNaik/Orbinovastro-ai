@@ -183,7 +183,15 @@ class CcsiTransitDetailsIn(BaseModel):
     day: int | None = Field(None, ge=1, le=31)
     hour: int | None = Field(None, ge=0, le=23)
     minute: int | None = Field(None, ge=0, le=59)
-    utc_offset_hours: float = 0.0
+    utc_offset_hours: float = Field(
+        0.0,
+        description=(
+            "Timezone offset of the hour/minute/year/month/day fields "
+            "above -- i.e. these fields are already LOCAL time at this "
+            "offset, not UTC. Only meaningful when year is supplied "
+            "(a custom transit moment); ignored otherwise."
+        ),
+    )
     latitude: float | None = Field(
         None,
         description=(
@@ -195,6 +203,20 @@ class CcsiTransitDetailsIn(BaseModel):
         ),
     )
     longitude: float | None = None
+    place: str = Field(
+        "",
+        description=(
+            "Optional display name for the transit location (e.g. "
+            "'Duluth, GA'), used only in report/PDF display -- 2026-09-24: "
+            "added after the Overview Report PDF's Transit Information "
+            "table showed 'Not available' for a defaulted-to-birth-location "
+            "transit. If omitted and no custom transit is given, the "
+            "birth's own place name is shown instead (since that's the "
+            "actual location being used); if omitted with a custom "
+            "lat/long, the coordinates are shown instead of leaving this "
+            "blank."
+        ),
+    )
 
 
 class CcsiRequestIn(BaseModel):

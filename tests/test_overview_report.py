@@ -25,6 +25,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 
 from app.engine.hit_calc import CcsiRow
 from app.engine.overview_report_builder import (
+    _shift_wall_clock,
+    _transit_details_dict,
     build_overview_report_pdf,
     build_parsed_from_ccsi,
     safe_filename,
@@ -73,14 +75,79 @@ def _fake_ccsi_report():
     )
 
 
-def test_house_and_planet_labels_are_complete_and_flagged_placeholder():
+# 2026-09-24, later still: tests for the Transit Information display fix
+# (see overview_report_builder.py's matching UPDATE docstring note) -- the
+# client caught a real generated PDF showing "Transit Place: Not available"
+# and an unlabeled, silently-UTC time. These check the local/UTC time-math
+# itself; test_main_overview_transit_display.py checks the separate
+# question of WHICH (place, offset) main.py resolves to feed in here.
+
+def test_shift_wall_clock_same_offset_is_a_no_op():
+    moment = BirthMoment(year=2026, month=9, day=24, hour=4, minute=4, second=0,
+                          utc_offset_hours=0.0, latitude=0.0, longitude=0.0)
+    same = _shift_wall_clock(moment, 0.0)
+    assert (same.year, same.month, same.day, same.hour, same.minute) == (2026, 9, 24, 4, 4)
+
+
+def test_shift_wall_clock_handles_day_rollover_forward():
+    # A UTC evening moment, shifted +5.5h (IST) as _transit_details_dict's
+    # "local" branch would when converting FROM UTC storage: 11:45 PM UTC
+    # + 5:30 crosses midnight into the next day.
+    moment = BirthMoment(year=2026, month=9, day=24, hour=23, minute=45, second=0,
+                          utc_offset_hours=0.0, latitude=0.0, longitude=0.0)
+    shifted = _shift_wall_clock(moment, 5.5)
+    assert (shifted.year, shifted.month, shifted.day, shifted.hour, shifted.minute) == (2026, 9, 25, 5, 15)
+
+
+def test_transit_details_dict_shows_both_local_and_utc_never_blank_place():
+    # The exact bug from the client's screenshot: a "now"-defaulted transit
+    # moment is always stored at UTC offset 0.0 internally (see
+    # transit.now_as_birth_moment), e.g. 2026-09-24 04:04 UTC. Displaying it
+    # for a birth location at +5:30 (IST) should show LOCAL as 09:34 AM the
+    # same day, and UTC explicitly labeled as such -- not one unlabeled,
+    # ambiguous time, and never "Not available" for the place.
+    transit_moment = BirthMoment(year=2026, month=9, day=24, hour=4, minute=4, second=0,
+                                  utc_offset_hours=0.0, latitude=20.8156, longitude=72.9595)
+    details = _transit_details_dict(transit_moment, "Amalsad, Gujarat, India", 5.5)
+
+    assert details["transit_place"] == "Amalsad, Gujarat, India"
+    assert details["transit_date_local"] == "24 September 2026"
+    assert details["transit_time_local"] == "9:34 AM"
+    assert details["transit_timezone_local"] == "UTC+05:30"
+    assert details["transit_date_utc"] == "24 September 2026"
+    assert details["transit_time_utc"] == "4:04 AM UTC"
+
+
+def test_transit_details_dict_custom_offset_needs_no_shift():
+    # A custom transit already expressed in its own local offset (e.g. the
+    # Duluth, GA screenshot elsewhere in this engagement, UTC-5): local
+    # should reproduce the given wall clock unchanged, and UTC should be
+    # correctly derived by subtracting that offset.
+    transit_moment = BirthMoment(year=2026, month=9, day=14, hour=23, minute=5, second=0,
+                                  utc_offset_hours=-5.0, latitude=33.9566391, longitude=-83.989006)
+    details = _transit_details_dict(transit_moment, "Duluth, GA", -5.0)
+
+    assert details["transit_time_local"] == "11:05 PM"
+    assert details["transit_timezone_local"] == "UTC-05:00"
+    assert details["transit_date_utc"] == "15 September 2026"
+    assert details["transit_time_utc"] == "4:05 AM UTC"
+
+
+def test_house_and_planet_labels_are_complete_and_real():
+    # 2026-09-24, later still: the client sent the real HIT_CALC "LIFE AREA"
+    # row (12 house cells + 10 Asc/planet cells), so overview_labels.py now
+    # ships that real text instead of the earlier standard-textbook
+    # placeholder -- LABELS_ARE_PLACEHOLDER flipped to False. This test was
+    # renamed from ..._flagged_placeholder to match; the completeness/
+    # em-dash-format checks are unchanged since the real data follows the
+    # exact same shape the placeholder data did.
     assert set(HOUSE_LIFE_AREAS.keys()) == set(range(1, 13))
     assert set(PLANET_SIGNIFICATIONS.keys()) == {
         "Asc", "Su", "Mo", "Ma", "Me", "Ju", "Ve", "Sa", "Ra", "Ke"
     }
     for text in HOUSE_LIFE_AREAS.values():
         assert " — " in text, "expected an em-dash label/description split (ccsi_parser.split_life_area)"
-    assert LABELS_ARE_PLACEHOLDER is True
+    assert LABELS_ARE_PLACEHOLDER is False
 
 
 def test_build_parsed_from_ccsi_carries_real_validated_numbers_through_unchanged():
@@ -219,12 +286,22 @@ def test_build_overview_report_pdf_end_to_end_with_fake_openai_client():
         utc_offset_hours=5.5,
         latitude=20.815615264029468, longitude=72.95947488134223,
     )
+    # 2026-09-24, later still: transit_place/transit_display_offset_hours
+    # now passed explicitly, the way main.py's real endpoint does via
+    # _resolve_transit_display_info() -- this is what main.py would resolve
+    # for a defaulted (no custom transit) request, i.e. the birth's own
+    # place/offset, since transit_moment here is just natal_moment reused.
     result = build_overview_report_pdf(
         _FakeOpenAIClient(), "Test Client", natal_moment, natal_moment,
         birth_place="Amalsad, Gujarat, India",
+        transit_place="Amalsad, Gujarat, India",
+        transit_display_offset_hours=5.5,
     )
 
     assert result.pdf_bytes.startswith(b"%PDF")
     assert len(result.pdf_bytes) > 5000  # a real multi-page report, not an empty/broken file
-    assert result.labels_are_placeholder is True
-    assert "placeholder" in result.disclaimer.lower() or "STANDARD" in result.disclaimer
+    # 2026-09-24, later still: real HIT_CALC label text is now in place (see
+    # test_house_and_planet_labels_are_complete_and_real), so this no longer
+    # carries the placeholder flag or the extra placeholder-caveat sentence.
+    assert result.labels_are_placeholder is False
+    assert "placeholder" not in result.disclaimer.lower()

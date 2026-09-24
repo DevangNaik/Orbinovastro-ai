@@ -327,6 +327,38 @@ def _resolve_natal_and_transit_moments(birth: BirthDetailsIn, transit) -> tuple[
     return natal_moment, transit_moment, source
 
 
+def _resolve_transit_display_info(
+    birth: BirthDetailsIn, transit, transit_moment: BirthMoment,
+) -> tuple[str, float]:
+    """2026-09-24, later still: split out of the Overview Report endpoint
+    after the client caught a real generated PDF showing "Transit Place:
+    Not available" and an unlabeled, silently-UTC transit time/timezone.
+    `transit_moment` itself is always stored at whatever offset it happened
+    to be built with by `_resolve_natal_and_transit_moments` (0.0/UTC for
+    the "now, at the birth location" default) -- that's correct for
+    computing planetary positions, but wrong to show a human as-is with no
+    explanation. Returns (display_place, display_offset_hours): the actual
+    location's name (or, lacking one, its coordinates -- never blank) and
+    the UTC offset that location's own LOCAL time should be shown at.
+
+    - No custom transit given (defaults to "now" at the birth location):
+      the birth's own place/offset, since that's the location actually
+      used.
+    - Custom transit given: that transit's own `place` if supplied,
+      otherwise its coordinates as a readable fallback; its own
+      `utc_offset_hours`, since that's what the caller intended as this
+      transit's local time (see `CcsiTransitDetailsIn.utc_offset_hours`'s
+      docstring)."""
+    is_custom = transit is not None and transit.year is not None
+    if is_custom:
+        place = transit.place or f"{transit_moment.latitude:.4f}, {transit_moment.longitude:.4f}"
+        offset = transit.utc_offset_hours
+    else:
+        place = birth.place or f"{transit_moment.latitude:.4f}, {transit_moment.longitude:.4f}"
+        offset = birth.utc_offset_hours
+    return place, offset
+
+
 @app.post("/api/ccsi", response_model=CcsiOut)
 def api_ccsi(body: CcsiRequestIn, _user=Depends(require_active_subscription)) -> CcsiOut:
     """CCSI (Cusp Conflict Stress Indicator): the connection-scoring block
@@ -384,15 +416,13 @@ def api_overview_report(body: OverviewReportRequestIn, _user=Depends(require_act
     complete, correctly-structured report -- just without those extra
     pages.
 
-    One real, currently-unresolved gap even in what IS returned: the house
-    life-area / planet-signification wording fed into the AI prompt and
-    printed in Table 1/Table 2 is `engine/overview_report/overview_labels.
-    py`'s STANDARD textbook placeholder text, not the client's own
-    HIT_CALC sheet wording (never captured) -- flagged via the
-    `X-Labels-Are-Placeholder` response header and folded into the
-    returned PDF's own disclaimer text. Swap that one module's two dicts
-    for the client's real wording once available; nothing else in this
-    endpoint needs to change.
+    2026-09-24, later still: the house life-area / planet-signification
+    wording is now the client's own real `HIT_CALC` "LIFE AREA" text, not a
+    placeholder (see `overview_labels.py`) -- `X-Labels-Are-Placeholder`
+    now reads "false" for a normal request. Also as of the same date, the
+    Transit Information block shows the transit's actual location (never
+    blank) plus BOTH its local time and UTC time, explicitly labeled --
+    see `_resolve_transit_display_info()` above.
 
     Returns the finished PDF as the raw response body (not JSON) --
     Content-Disposition names it "<client name>_overview.pdf"."""
@@ -403,10 +433,15 @@ def api_overview_report(body: OverviewReportRequestIn, _user=Depends(require_act
 
     try:
         natal_moment, transit_moment, _source = _resolve_natal_and_transit_moments(body.birth, body.transit)
+        transit_place, transit_display_offset = _resolve_transit_display_info(
+            body.birth, body.transit, transit_moment,
+        )
         client = OpenAI()
         result = build_overview_report_pdf(
             client, body.client_name, natal_moment, transit_moment,
             birth_place=body.birth.place,
+            transit_place=transit_place,
+            transit_display_offset_hours=transit_display_offset,
         )
     except HTTPException:
         raise
