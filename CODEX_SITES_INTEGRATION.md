@@ -496,6 +496,40 @@ NOT to drop just because this particular example doesn't show them:
 
 ## Planet color scheme and the enriched Planet Details Table (updated, 2026-09-24 later still)
 
+**UPDATE (2026-09-24, latest):** client feedback on the live "Conj. /
+Aspects" cell -- the three stacked lines (`Conj:` / `Aspects:` /
+`Aspected by:`) currently always render, showing `"Conj: —"` etc. as
+filler even when there's genuinely nothing there. The client's exact
+words: *"Do not print if there is no Conj, Aspect or Aspected by its
+just filler with no info.. If there is then add that label."* **This
+REVERSES the earlier guidance below** (originally: "Dash on any line
+with nothing to show, never an omitted line" / "use a plain dash only
+where a field is genuinely unavailable... never omit the line
+entirely") -- that guidance is now superseded for these three specific
+lines only. New rule, for all three lines, on every row (Ascendant,
+the 9 classical grahas, and Ur/Ne/Pl alike):
+
+- `conjunctions` empty → omit the "Conj:" line entirely (no line, no
+  dash, nothing rendered for it).
+- `aspects` empty, missing, or not present on this entry (e.g. the
+  Ascendant has no `aspects` key at all) → omit the "Aspects:" line
+  entirely.
+- `aspected_by` empty → omit the "Aspected by:" line entirely.
+- If a row has all three empty (e.g. a natal chart with an isolated
+  outer planet, or an Ascendant nobody aspects), the whole cell is
+  simply blank/empty for that row -- that's fine, don't substitute a
+  single placeholder dash for the whole cell either.
+- If a row has at least one of the three populated, show only that
+  line (or those lines) with its real label and value -- e.g. a planet
+  with an aspect but no conjunction and nothing aspecting it back shows
+  just one line: `"Aspects: Mo (7th)"`, nothing else in that cell.
+
+This does NOT change any other dash in the table (Nature/Functional
+Nature/Flags dashes for the Ascendant or for Ur/Ne/Pl, the Meaning
+column, etc.) -- those still render their existing dash-based
+treatment; this fix is scoped only to the three Conj/Aspects/Aspected-by
+lines inside the "Conj. / Aspects" cell.
+
 **UPDATE (2026-09-24, yet even later still):** three more changes, all
 server-side already, nothing structural for Codex to redesign:
 
@@ -565,8 +599,11 @@ match:
         Mo (7th)"`.
      3. **Aspected by** -- which planets' drishti falls on THIS one, e.g.
         `"Aspected by: Ma (7th)"`.
-     Dash on any line with nothing to show, never an omitted line -- see
-     point 5 below for exactly which rows are always dashed and why.
+     ~~Dash on any line with nothing to show, never an omitted line.~~
+     **SUPERSEDED (see the "UPDATE (2026-09-24, latest)" box at the top
+     of this section): omit the line entirely when empty, don't show a
+     dash filler.** Point 5 below (rewritten to match) still tells you
+     which lines the Ascendant/outer planets never have data for.
    - **"Meaning"** (new, the old "Details" cell's second half, now its own
      column) -- just the full `meaning` sentence, given enough width to
      show it complete without horizontal clipping -- that was the
@@ -575,7 +612,11 @@ match:
    - Keep every existing value and sentence -- this is a re-layout, not a
      content cut. Use a plain dash (`—`) only where a field is genuinely
      unavailable for that row (see point 5 below for the Ascendant's
-     specific gaps), never omit the line entirely.
+     specific gaps), never omit the line entirely. **Exception: the three
+     Conj/Aspects/Aspected-by lines inside the "Conj. / Aspects" cell --
+     see the "UPDATE (2026-09-24, latest)" box at the top of this
+     section, which reverses this "never omit" rule for those three
+     lines only (omit when empty, don't dash).**
    - On narrow/phone-width screens, let all three cells wrap their text
      rather than truncating or forcing horizontal scroll -- see the
      existing "Mobile-responsive" guidance further down, which already
@@ -600,8 +641,10 @@ match:
    Jupiter/Saturn each get two additional special aspects (Mars: 4th/8th;
    Jupiter: 5th/9th; Saturn: 3rd/10th). Both `aspects` and `aspected_by`
    are lists of `{code, aspect}` (e.g. `{"code": "Ju", "aspect": "5th"}`)
-   -- render as `"Ju (5th)"`, comma-joined if more than one, dash if
-   empty. **This is NOT symmetric in general** -- Mars aspecting Venus at
+   -- render as `"Ju (5th)"`, comma-joined if more than one, ~~dash if
+   empty~~ **line omitted entirely if empty (see the "UPDATE
+   (2026-09-24, latest)" box at the top of this section)**. **This is
+   NOT symmetric in general** -- Mars aspecting Venus at
    the 8th doesn't mean Venus aspects Mars back (only the universal 7th
    is always mutual) -- so `aspects` and `aspected_by` can legitimately
    differ for the same planet; render both, don't assume one implies the
@@ -616,9 +659,14 @@ match:
    idea) -- render all of these the same way as any planet's row. It has
    **no** `code`/`retrograde`/`conjunctions`/`nature`/`aspects` -- the
    Ascendant isn't a planet, so it never casts a conjunction or an aspect
-   of its own; use a dash for those specific lines only (Nature/Flags'
-   nature half, Conjunctions, and Aspects -- but NOT Aspected By, which is
-   real for the Ascendant).
+   of its own; use a dash for Nature/Flags' nature half (that's in the
+   "Planet / Position" cell, unaffected by the latest UPDATE box), but
+   for the "Conj. / Aspects" cell specifically **omit the Conjunctions
+   and Aspects lines entirely for the Ascendant row** (per the "UPDATE
+   (2026-09-24, latest)" box at the top of this section -- it never has
+   either, so those two lines just never render for this row). Aspected
+   By is real for the Ascendant and DOES render, with its normal
+   omit-if-empty treatment like any other row.
 6. ~~Uranus / Neptune / Pluto are intentionally still not in this
    table.~~ **SUPERSEDED (see the UPDATE box at the top of this section):
    they're in now.** `/api/chart`'s `planets` array has 12 entries, not 9
@@ -677,21 +725,27 @@ down for the full shape):
 - `conjunctions` — a list of `{code, orb_degrees}` for every other planet
   sharing this one's D1 sign (empty if none). Render on the first line of
   the "Conj. / Aspects" cell, e.g. `"Conj: Sa · 3.3°"` for a planet
-  listing one conjunction, joined with commas if there's more than one,
-  or a dash if the list is empty — this is exactly the information a
-  visitor needs to understand why two planet codes appear stacked in the
-  same house box. Not present on the Ascendant entry (it isn't a planet,
-  so it can't be "in conjunction" with one in this sense) — use a dash
-  there.
+  listing one conjunction, joined with commas if there's more than one.
+  ~~or a dash if the list is empty~~ **SUPERSEDED (UPDATE, 2026-09-24,
+  latest): omit the "Conj:" line entirely if the list is empty — no
+  line, no dash.** This is exactly the information a visitor needs to
+  understand why two planet codes appear stacked in the same house box.
+  Not present on the Ascendant entry (it isn't a planet, so it can't be
+  "in conjunction" with one in this sense) — omit the line for the
+  Ascendant row too, same as any other empty case.
 - `aspects` / `aspected_by` — **new**, each a list of `{code, aspect}`
   (e.g. `{"code": "Ju", "aspect": "5th"}`) — classical Parashari whole-sign
   graha drishti, a completely separate concept from `conjunctions` (see
   the UPDATE box's point 4 above for the full rule). Render as the second
   and third lines of the "Conj. / Aspects" cell: `"Aspects: Ju (5th), Mo
-  (7th)"` and `"Aspected by: Ma (7th)"`, comma-joined, dash if either list
-  is empty. The Ascendant entry has a real `aspected_by` (planets can
-  aspect the 1st house/Lagna) but no `aspects` key at all — it never
-  casts one, use a dash for that specific line only.
+  (7th)"` and `"Aspected by: Ma (7th)"`, comma-joined. ~~dash if either
+  list is empty~~ **SUPERSEDED (UPDATE, 2026-09-24, latest): omit
+  whichever of the two lines is empty, independently — a planet can have
+  a real "Aspects:" line and no "Aspected by:" line, or vice versa, so
+  check each list separately.** The Ascendant entry has a real
+  `aspected_by` (planets can aspect the 1st house/Lagna, omit-if-empty
+  like normal) but no `aspects` key at all — it never casts one, so
+  that line is always omitted for the Ascendant, not dashed.
 - `nature` — `"Malefic"` or `"Benefic"`, or an empty string for Uranus/
   Neptune/Pluto (dash). Renders on the fourth line of the "Planet /
   Position" cell, alongside flags (see the UPDATE box's point 1 above).
@@ -1239,10 +1293,18 @@ something Codex needs to handle.
    own planet-code colors, across all four views, not just D1, and
    readable without horizontal clipping (widen the Meaning column, or let
    it wrap on narrow screens). Specifically check: (a) the **Ascendant
-   row** shows a real Nakshatra(Pada), Meaning, and Aspected By, with a
-   dash (not blank) for Nature/Conjunctions/Aspects, which it never has —
-   if Nakshatra(Pada)/Meaning are blank instead, the backend fix didn't
-   make it into this deploy; (b) for a chart with **Jupiter in Capricorn**
+   row** shows a real Nakshatra(Pada), Meaning, and (if anyone aspects the
+   Lagna for this chart) an Aspected By line, with a dash for Nature (in
+   the "Planet / Position" cell) but the Conjunctions and Aspects lines
+   simply OMITTED (no line, no dash) since it never has either — if
+   Nakshatra(Pada)/Meaning are blank instead, the backend fix didn't
+   make it into this deploy; (a2) more generally, for EVERY row, any of
+   Conj/Aspects/Aspected-by that's empty for that planet is omitted
+   entirely, not shown as `"Conj: —"` filler (client feedback,
+   2026-09-24, latest — see the UPDATE box at the top of the "Planet
+   color scheme..." section) — a row can legitimately show just one of
+   the three lines, or none at all, and that's correct; (b) for a chart
+   with **Jupiter in Capricorn**
    (or any planet in its sign of debilitation/exaltation/own sign), that
    planet's fourth line shows the corresponding compact code (`D↓`/`E↑`/
    nothing extra for Own Sign's badge styling) — not just Retrograde;
