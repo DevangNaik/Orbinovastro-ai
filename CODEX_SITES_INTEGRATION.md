@@ -372,6 +372,63 @@ the API doesn't care how it looks, only that the data displayed came from it.
 
 ## Chart wheel diagram (exact algorithm — reproduce, don't redesign)
 
+**UPDATE (2026-09-24, newest) — the small in-box numeral was the wrong
+number, and the sign-abbreviation text should come out entirely.** Two
+pieces of client feedback, read together:
+
+1. *"The Rashi Number are not correct. this should be Cap as 10 not Cap
+   1."* -- the small muted numeral currently drawn near each box's
+   center-ward vertex (added in the "later still again" UPDATE box
+   below, point 2) is the box's own **house-position number** (fixed by
+   geometry -- box position 1 is always the top kite, no matter the
+   chart). That's a different thing from what the client means by
+   "Rashi Number": the sign's own **fixed zodiacal index**, the same for
+   every chart regardless of ascendant -- Aries=1, Taurus=2, Gemini=3,
+   Cancer=4, Leo=5, Virgo=6, Libra=7, Scorpio=8, Sagittarius=9,
+   Capricorn=10, Aquarius=11, Pisces=12. For a Capricorn-ascendant chart,
+   Capricorn sits in the house-1 (top) box -- the old numeral correctly
+   showed "1" for that box's *house position*, but the client wants "10"
+   there, because Capricorn is universally the 10th sign. **Change the
+   numeral to this fixed Rashi index of whichever sign occupies that
+   box**, not the house-position number:
+   ```js
+   const RASHI = ["Aries","Taurus","Gemini","Cancer","Leo","Virgo",
+                  "Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"];
+   const rashiNumber = (sign) => RASHI.indexOf(sign) + 1; // 1-based, fixed, never depends on ascendant
+   ```
+   Apply this per box, using whichever `sign` that box already resolves
+   to under "Which sign goes in which box, per chart type" below (D1's
+   `wholeSignHouseList` result, Bhava Chalit/Cuspal's `houses[n-1].sign`,
+   D9's navamsa sign for that box) -- the box-to-sign resolution logic
+   itself is unchanged, only what number gets printed once you know the
+   sign changes.
+2. *"Make it look like this... if you want you can write 1-12 Rashi
+   number below in text so all Cap Aqu etc will go away from chart"* --
+   the client attached a reference wheel (Ra(R)/Mon/Ma-style compact
+   planet labels, small numbers 1-12 clustered at the diamond's center,
+   **no sign-abbreviation text anywhere** in any box) and asked for that
+   treatment. **This reverses point 4 in the "later still again" UPDATE
+   box below** ("Do NOT drop the sign abbreviation line") -- that
+   guidance is now superseded: **drop the sign-abbreviation text (e.g.
+   "Cap", "Aqu") from inside every box entirely**, for all four chart
+   views. The box now shows only: the fixed Rashi number near the
+   center-ward vertex (per point 1 above) and the planet label(s), if
+   any. Optionally add one small static legend below each wheel (or once
+   for the whole page, since it never changes) spelling out the mapping,
+   e.g. `"1 Aries · 2 Taurus · 3 Gemini · 4 Cancer · 5 Leo · 6 Virgo · 7
+   Libra · 8 Scorpio · 9 Sagittarius · 10 Capricorn · 11 Aquarius · 12
+   Pisces"` -- small, muted, one line, so a visitor can still look up
+   what a number means without it cluttering every box.
+   This is a text-labels-only change -- it does **not** touch the
+   Fire/Earth/Air/Water element-tinted box backgrounds, the per-planet
+   accent colors, the compact `Code(R) DD°MM'` planet-label format, or
+   the box polygon geometry, all of which stay exactly as already
+   specified; only the sign-abbreviation text line and the numeral's
+   meaning change.
+3. This applies to **all four chart views** (D1, Bhava Chalit, D9,
+   Cuspal) -- same as every other wheel-formatting rule in this section,
+   they all share one rendering path.
+
 **CORRECTED 2026-09-24 (latest) — the polygon table below was mirrored left-right; if Codex already built the wheel from the old table, replace it with this corrected one.** The client sent a real Horosoft screenshot and their own Excel Kundli chart as the standard-practice reference and pointed out the live wheel was flipped — concretely, house 4 (and everything on "that side") was drawn on the right when it belongs on the left (and vice versa for the other side). Root cause, confirmed by re-deriving the geometry from the client's own reference: the original table numbered the 12 boxes going **clockwise** from the top box (1→2 upper-right→3→4 right kite→...→10 left kite→...), but the correct, standard North Indian convention numbers them going **counter-clockwise** from the top (1→2 upper-**left**→3→4 **left** kite→...→10 **right** kite→...). This was independently confirmed against the client's own real Excel chart: house 4 (Aries, containing Mars for the reference birth chart) sits in the **left** kite there, and house 10 (Libra, containing Mercury) sits in the **right** kite — the opposite of what the old table drew. **The fix is a simple mirror**: every polygon/label coordinate below has its x mirrored (`x → 400 − x`) from the original table, with the same house numbers — nothing else about the geometry, the box shapes, or the sign-placement logic changes.
 
 This is the same North Indian diamond-chart algorithm already built, tested,
@@ -414,10 +471,14 @@ x/y — **corrected, mirrored table**):
 
 Draw all 12 polygons (house 1's box gets a subtle fill to mark it as the
 ascendant; the rest transparent), then an outer 2px border rect, then a small
-"ASC ↑" label at the top-center (200, 14). Each house box's text: the sign
-abbreviation (first 3 letters) on the first line in the accent color, then
-one line per occupying planet's 2-letter code (append a small "ᴿ" superscript
-or similar retrograde mark if `retrograde` is true). **Adopt the client's own
+"ASC ↑" label at the top-center (200, 14). Each house box's text: ~~the sign
+abbreviation (first 3 letters) on the first line in the accent color, then~~
+**SUPERSEDED (see the "UPDATE (2026-09-24, newest)" box at the top of this
+section): no sign-abbreviation text -- start straight with** one line per
+occupying planet's 2-letter code (append a small "ᴿ" superscript
+or similar retrograde mark if `retrograde` is true) -- this line format itself
+is further superseded below by the compact `Code(R) DD°MM'` format anyway.
+**Adopt the client's own
 per-planet color scheme** (see the new "Planet color and element scheme"
 section below) for each planet's code label here too, not just in the data
 table underneath — the wheel and the table should read as one consistent
@@ -438,27 +499,35 @@ NOT to drop just because this particular example doesn't show them:
    in that planet's own accent color. This replaces the plainer "2-letter
    code + superscript ᴿ" format described just above — use this compact
    DMS-with-inline-retrograde format instead.
-2. **Adopt: a small house-number numeral near each box's inner
-   (center-ward) vertex** — a subtle gray/muted small number (1–12,
-   matching the polygon table's own house numbering above), positioned
-   close to where that house's polygon point touches the diamond's
-   center, the same way the reference image shows small numbers clustered
-   near the middle of the chart. This is in addition to, not a
-   replacement for, the sign abbreviation and planet labels already
-   specified.
+2. ~~Adopt: a small house-number numeral near each box's inner
+   (center-ward) vertex — a subtle gray/muted small number (1–12,
+   matching the polygon table's own house numbering above)~~ **SUPERSEDED
+   (see the "UPDATE (2026-09-24, newest)" box at the top of this
+   section): the number shown there is the sign's fixed Rashi index, not
+   the house-position number.** Position stays the same — close to where
+   that house's polygon point touches the diamond's center, the same way
+   the reference image shows small numbers clustered near the middle of
+   the chart.
 3. **Adopt: properly centered planet labels within each box.** Stack each
-   box's planet labels (and the sign abbreviation above them) centered
-   both horizontally and vertically around that house's label-anchor
-   coordinate from the polygon table above, with consistent, even line
-   spacing — don't let labels drift toward one edge of the kite/triangle
-   or overlap the box's border, which is what "properly centered" is
-   asking to fix versus whatever the current build renders.
-4. **Do NOT drop: the sign abbreviation line, or the Fire/Earth/Air/Water
-   element-tinted box backgrounds** already specified above and in the
+   box's planet label(s) centered both horizontally and vertically
+   around that house's label-anchor coordinate from the polygon table
+   above, with consistent, even line spacing — don't let labels drift
+   toward one edge of the kite/triangle or overlap the box's border,
+   which is what "properly centered" is asking to fix versus whatever
+   the current build renders. ~~(and the sign abbreviation above them)~~
+   **SUPERSEDED — no sign abbreviation to center any more, see the
+   "UPDATE (2026-09-24, newest)" box at the top of this section.**
+4. ~~Do NOT drop: the sign abbreviation line, or the Fire/Earth/Air/Water
+   element-tinted box backgrounds already specified above and in the
    "Planet color scheme" section below. This reference example happens to
    use plain white boxes with no sign label at all — that's simply how
    that third-party tool renders it, not an instruction to remove either
-   feature from this build. Both stay exactly as already specified.
+   feature from this build. Both stay exactly as already specified.~~
+   **SUPERSEDED (2026-09-24, newest) — the client has now asked for
+   exactly that: see the "UPDATE (2026-09-24, newest)" box at the top of
+   this section. Drop the sign-abbreviation text; the Fire/Earth/Air/
+   Water element-tinted backgrounds are unaffected and stay as
+   specified.**
 5. ~~Do NOT add Uranus/Neptune/Pluto rows or wheel labels.~~
    **SUPERSEDED (2026-09-24, yet even later still): DO add them now** —
    see the UPDATE box at the top of the "Planet color scheme and the
@@ -491,7 +560,9 @@ NOT to drop just because this particular example doesn't show them:
   matching its `navamsa_house`.
 - **Cuspal Chart**: same as Bhava Chalit's box-to-sign mapping (`houses[n-1].sign`),
   but no planets — instead label each box with its cusp longitude (e.g.
-  "20.19°") beneath the sign abbreviation, since the point of this chart is
+  "20.19°") beneath ~~the sign abbreviation~~ **the box's Rashi number
+  (see the "UPDATE (2026-09-24, newest)" box at the top of this section
+  — no sign abbreviation text any more)**, since the point of this chart is
   the cusp positions themselves.
 
 ## Planet color scheme and the enriched Planet Details Table (updated, 2026-09-24 later still)
@@ -1279,11 +1350,20 @@ something Codex needs to handle.
    LEFT kite box, and Mercury (Libra, house 10) in the RIGHT kite box — if
    they're swapped, the corrected mirrored polygon table wasn't applied.**
    Also confirm the wheel diagram itself matches the latest visual-reference
-   update: a small muted house-number numeral near each box's center-ward
-   vertex, each planet's in-box label in the compact `Code(R) DD°MM'`
-   format (colored per planet), everything centered within its box, and
-   the sign abbreviation line plus the Fire/Earth/Air/Water element tint
-   still present (not dropped).
+   update: a small muted **Rashi number** (the sign's own fixed 1–12
+   zodiacal index — e.g. Capricorn always shows "10", regardless of which
+   house box it lands in) near each box's center-ward vertex — NOT the
+   house-position number, and NOT a sign-abbreviation text label anywhere
+   in the box (that text is dropped per the "UPDATE (2026-09-24, newest)"
+   box in the "Chart wheel diagram" section — check a Capricorn-ascendant
+   chart's house-1/top box specifically: it must show "10", not "1", and
+   must not say "Cap" anywhere in the box). Each planet's in-box label
+   still uses the compact `Code(R) DD°MM'` format (colored per planet),
+   everything centered within its box, and the Fire/Earth/Air/Water
+   element tint still present (that part was NOT dropped, only the
+   sign-abbreviation text was). If a below-chart legend was added
+   (optional per that UPDATE box), confirm it correctly maps all 12
+   numbers to sign names.
    Also confirm each wheel's Planet Details Table beneath it uses the
    exact THREE-COLUMN layout ("Planet / Position" stacking Planet ·
    Sign/House-for-this-tab · Degree/Nakshatra(Pada) · Nature/Flags;
