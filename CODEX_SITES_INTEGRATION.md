@@ -5,6 +5,33 @@ build. It describes an existing, already-built, already-tested backend — Codex
 job is to build a **frontend page that calls it**, not to reimplement any of the
 astrology math itself.
 
+> **Update (2026-09-27): the Preview's house numbers now use a different
+> convention than before -- cuspal (Bhava Chalit / Nirayana bhava), not
+> whole-sign -- and this must be visibly indicated to the visitor.** No new
+> endpoint or request shape -- `/api/teaser`'s response fields are the same
+> ones you already render. What changed server-side: each placement's
+> `house` is now computed the same way as `/api/chart`'s own `house` field
+> (cuspal/Bhava Chalit, the KP convention), instead of the whole-sign
+> counting it used before (which matched `/api/chart`'s `rasi_house`
+> instead). `sign` is unaffected -- it was always, and still is, the D1/Rasi
+> sign. **Practical effect: the Preview's house numbers will now match the
+> Chart tab's Bhava Chalit view, not its D1 view, and for some charts every
+> placement can shift by a full house at once** (this happens when the
+> Ascendant itself sits close to a sign boundary -- it's expected, not a
+> bug). The client explicitly asked that this be indicated to visitors, not
+> left implicit, so:
+> - Add one short, static line directly under the "Planetary Placements"
+>   section heading (see item 2 below) -- this doesn't come from the API,
+>   it's fixed copy: **"Sign = your D1 (Rasi) birth chart. House = cuspal
+>   (Bhava Chalit / Nirayana bhava)."**
+> - The `disclaimer` field's wording has also been updated to spell this out
+>   in full (see the new example under `/api/teaser` below) -- keep
+>   rendering it as before, no layout change needed there.
+> If you already built the Preview against the earlier `/api/teaser`
+> contract, the only change needed is adding that one static line under the
+> table heading -- everything else (field names, table structure) is
+> unchanged.
+
 > **Update (2026-09-25): this is an incremental change to the already-live page,
 > not a from-scratch rebuild.** The site at `orbinovastro.com/ai` is already
 > connected to `BASE_URL` and working (Birth Details form, Chart, Transit, KP
@@ -159,13 +186,44 @@ and Preview / Chart / Transit / KP Significators / Chat tabs):
      (10 entries: Ascendant + all 9 planets). Each entry has `code`,
      `name`, `sign`, `house`, `retrograde`, `governs`, `house_domain`, and
      `narrative` (a full sentence or two of analysis for that placement).
-     Render this as a clean, scannable list or table -- one row/card per
-     placement, e.g. a compact header line ("Jupiter -- Capricorn -- House
-     1") followed by the `narrative` text -- not as ten disconnected walls
-     of text. A small "R" badge on `retrograde: true` rows is a nice touch
-     (standard astrology convention).
+     **Directly under this section's heading, add one short static caption
+     line (fixed copy, not from the API): "Sign = your D1 (Rasi) birth
+     chart. House = cuspal (Bhava Chalit / Nirayana bhava)."** -- small,
+     unobtrusive text (similar weight to a caption or the beta chips
+     elsewhere on the page), but visible without scrolling to the bottom
+     disclaimer. This exists because `house` is now computed on a
+     different convention than `sign` (see the update banner at the top of
+     this doc), and the client wants that distinction visible, not just
+     buried in the disclaimer paragraph.
+     **The client has approved a specific reference layout for this
+     section -- a real two-column table, not cards or a bulleted list:**
+     - Column 1 header: "Placement". Column 2 header: "What it may signify
+       for you".
+     - One row per entry. Column 1 is a short, bold label built from
+       `name`, `sign`, and `house` (e.g. "**Sun in Virgo · House 9**" --
+       on `retrograde: true` add "retrograde" into the label itself, e.g.
+       "**Mars retrograde in Aries · House 4**", rather than a separate
+       badge). Column 2 is the `narrative` text, rendered as normal body
+       text (no need to bold anything inside it -- the narrative's own
+       wording already calls out the notable bits, like a debilitated or
+       own-sign placement).
+     - A thin row divider between entries, generous row padding (the
+       reference the client approved uses noticeably more vertical
+       breathing room than a dense data table -- this is meant to read
+       calmly, not like a spreadsheet).
+     - A small copy-to-clipboard icon in the table's top-right corner
+       (copies the whole placements section as text) is a nice touch the
+       client specifically liked, but skip it if it adds real complexity --
+       it's optional polish, not a requirement.
+     - Use the site's own color palette and type here -- NOT a plain
+       black-background/white-text theme. The client's reference example
+       happened to be rendered on black, but their explicit note was "of
+       course with color pattern matching with site" -- match
+       orbinovastro.com's existing colors, fonts, and card/table styling.
    - `synthesis` -- a closing structural paragraph (kendra/trikona house
-     counts). Render as body text.
+     counts, and which houses carry extra weight in this specific chart).
+     Lead with a short bold label the client's approved reference uses --
+     "**The larger pattern:**" -- followed by the paragraph as body text.
    - `upgrade_pitch` -- the paragraph that explains exactly what the paid
      Diagnostic Report adds beyond this preview. Give this its own
      visually distinct block (not identical styling to the narrative
@@ -347,6 +405,14 @@ a debug dashboard. Concretely:
   obvious next action (real button styling, not a plain link) and should
   sit directly below the `upgrade_pitch` paragraph, not buried further
   down the page.
+- **The client has directly approved a reference layout for this page** --
+  a two-column "Placement / What it may signify for you" table, generous
+  row spacing, a bold "The larger pattern:" lead-in on the closing
+  synthesis paragraph. See the exact spec under "What to build" item 2
+  above. Build the Preview tab to match that structure, but in
+  orbinovastro.com's own colors and type -- the approved reference
+  happened to be shown on a plain black background, which is NOT part of
+  what was approved; match the site's real palette.
 - **The `upgrade_pitch` block is the conversion moment -- give it a
   distinct visual treatment** (e.g. a subtly shaded panel or a border
   accent) so it reads as "here's what you get next," not as one more
@@ -464,12 +530,20 @@ charts — that's not how D-charts work).
 
 ### `POST /api/teaser`
 The free, client-facing "Free Preview" -- deliberately not gated behind
-sign-in, even once auth is turned on elsewhere. A full D1 (Rasi) chart
-PLACEMENT analysis -- which sign and house every planet occupies, and what
-that means in the practice's own real house/planet language -- but
-deliberately stops short of the paid report's proprietary stress/support
-scoring (`upgrade_pitch` says so explicitly; see `engine/teaser.py`'s
-module docstring on the backend for the full reasoning, if you want it).
+sign-in, even once auth is turned on elsewhere. A full chart PLACEMENT
+analysis -- which sign and house every planet occupies, and what that
+means in the practice's own real house/planet language -- but deliberately
+stops short of the paid report's proprietary stress/support scoring
+(`upgrade_pitch` says so explicitly; see `engine/teaser.py`'s module
+docstring on the backend for the full reasoning, if you want it).
+
+**Two different systems, on purpose:** each placement's `sign` is D1/Rasi
+(straight zodiacal sign). Each placement's `house` is cuspal (Bhava
+Chalit / Nirayana bhava) -- the same convention `/api/chart`'s own `house`
+field and this practice's KP significators/paid scoring use. These are
+not the same house-numbering convention as `/api/chart`'s `rasi_house` --
+see the update banner at the top of this doc, and add the short static
+caption line under the Planetary Placements heading per item 2 above.
 
 Request: same `BirthDetailsIn` shape as `/api/chart` (only `name` and the
 birth/location fields are used; `place` is ignored here).
@@ -491,17 +565,21 @@ headline/blurb-only shape; every field below is present on every response:
       "narrative": "The Ascendant -- karaka (significator) for Self/Body (core identity, physical vitality, and the outward expression of will) -- rises in Capricorn, defining the first house: Self/Personality (physical body, appearance, temperament, vitality, and overall approach to life). Every other placement in this chart is read relative to this one, making it the fixed reference point of the entire structure."
     },
     {
-      "code": "Su", "name": "Sun", "sign": "Virgo", "house": 9,
-      "retrograde": false, "governs": "Soul/Vitality", "house_domain": "Fortune/Dharma",
-      "narrative": "Sun -- karaka (significator) for Soul/Vitality (inner life force, emotional security, and instinctive nurturing needs) -- is positioned in Virgo, within the ninth house: Fortune/Dharma (father, teachers, higher learning, spirituality, luck, and long-distance or foreign journeys). In structural terms, Sun channels its core signification into the domain of fortune/dharma, making this house one of the principal channels through which soul/vitality is expressed in this chart."
+      "code": "Su", "name": "Sun", "sign": "Virgo", "house": 8,
+      "retrograde": false, "governs": "Soul/Vitality", "house_domain": "Transformation/Longevity",
+      "narrative": "Your Sun sits in Virgo (careful and detail-driven), right in your eighth house -- what this practice calls your Transformation/Longevity house, the part of life connected to life span, inheritance, hidden matters, sudden change, and occult interests. Sun itself represents inner life force, emotional security, and instinctive nurturing needs -- your Soul/Vitality -- so this is one of the places in life where that side of you shows up most clearly."
     }
     // ... 8 more entries: Mo, Ma, Me, Ju, Ve, Sa, Ra, Ke, in that order,
-    // same shape as above. 10 entries total (Ascendant + 9 planets).
+    // same shape as above. 10 entries total (Ascendant + 9 planets). Note
+    // `sign` (D1/Rasi) and `house` (cuspal/Bhava Chalit) can legitimately
+    // point at what looks like a "mismatched" pairing compared to a plain
+    // whole-sign chart -- that's expected, see the update banner at the
+    // top of this doc.
   ],
   "synthesis": "Viewed as a whole, this chart distributes its nine planetary placements across 8 of the twelve houses. 3 of 9 placements fall in the angular (kendra) houses -- the first, fourth, seventh, and tenth, the classical structural axis of self, home, partnership, and career -- and 2 of 9 fall in the trinal (trikona) houses -- the first, fifth, and ninth, associated with fortune, creativity, and higher purpose. These are structural counts, not a verdict of favorability: this preview describes WHERE each planet sits, not whether that placement is presently operating under supportive or adverse astrological pressure.",
   "upgrade_pitch": "This is precisely where the free preview stops, by design. Placement -- which sign, which house, which of your twelve life domains each planet activates -- is descriptive fact, and it is shown above in full, across all nine planets and the Ascendant. What it does not yet tell you is how those placements interact: which houses are presently reinforced and which are under measurable stress, both in this natal chart and under today's transiting sky, and how your current planetary period (dasha) is activating specific placements right now. That quantified, house-by-house diagnostic -- built on this practice's own proprietary connection-and-stress scoring methodology -- is the core of the full Diagnostic Report, delivered as a complete written assessment, not a set of raw numbers.",
   "book_url": "https://orbinovastro.square.site/s/appointments",
-  "disclaimer": "A free preview only -- the D1 (Rasi) chart's placement structure: which sign and house every planet occupies, and which of this practice's own real house/planet domains that activates. All positions are Nirayana (sidereal), from the validated mechanical layer. Deliberately does NOT include KP significators (see the beta significators feature), dasha/bhukti timing, or the proprietary connection-and-stress scoring (CCSI) that the full paid Diagnostic Report is built on -- this preview describes WHERE each planet sits, not whether that placement is currently under astrological support or stress."
+  "disclaimer": "A free preview only -- which sign and house every planet occupies, and which of this practice's own real house/planet domains that activates. Sign (rashi) is your D1 (Rasi) birth chart placement. House (bhava) is cuspal (Bhava Chalit / Nirayana bhava) -- the same house convention this practice's KP significators and the paid Diagnostic Report's scoring use -- so a planet's house can differ from a simple whole-sign count: sometimes just one placement near a house cusp, and when the Ascendant itself sits close to a sign boundary, sometimes every placement shifted by a full house at once. Neither number is wrong -- they're two established, valid conventions answering slightly different questions. All positions are Nirayana (sidereal), from the validated mechanical layer. Deliberately does NOT include KP significators (see the beta significators feature), dasha/bhukti timing, or the proprietary connection-and-stress scoring (CCSI) that the full paid Diagnostic Report is built on -- this preview describes WHERE each planet sits, not whether that placement is currently under astrological support or stress."
 }
 ```
 
@@ -509,10 +587,13 @@ Rendering guidance (see "What to build" item 2 and "Visual design pass" above
 for the full layout spec):
 - `headline` — large opening line.
 - `executive_summary` — a full paragraph, body text.
-- `placements` — a scannable list/table, one row or card per entry, showing
-  at minimum `name` + `sign` + `house` as a header and `narrative` as the
-  body; a small badge on `retrograde: true` entries is a nice touch.
-- `synthesis` — a closing paragraph, body text.
+- `placements` — the approved two-column table (Placement / What it may
+  signify for you) described in "What to build" item 2 above -- not cards,
+  not a bulleted list. Include the static "Sign = D1 (Rasi)... House =
+  cuspal (Bhava Chalit / Nirayana bhava)" caption line directly under the
+  section heading, per item 2 above.
+- `synthesis` — a closing paragraph, led with a bold "The larger pattern:"
+  label per the approved reference.
 - `upgrade_pitch` — its own visually distinct block (this is the conversion
   moment — see "Visual design pass" above), directly followed by the
   **"Book Your Full Reading"** button linking to `book_url` (opens in a new
@@ -697,12 +778,16 @@ something Codex needs to handle.
 2. Fill in a known birth detail (or use "Look up" with a place name) and
    generate the **Preview** — confirm the headline and executive summary
    read sensibly, all 10 placement entries (Ascendant + 9 planets) render
-   with their own narrative text, the closing synthesis and upgrade-pitch
-   paragraphs both appear with the upgrade pitch visually distinct, and the
-   "Book Your Full Reading" button opens `book_url` in a new tab. Cross-check
-   one or two placements' `house`/`sign` values against the Chart tab's own
-   output for the same birth details -- they must agree exactly (both read
-   from the same underlying chart).
+   with their own narrative text, the "Sign = D1... House = cuspal..."
+   caption line appears under the Planetary Placements heading, the closing
+   synthesis and upgrade-pitch paragraphs both appear with the upgrade
+   pitch visually distinct, and the "Book Your Full Reading" button opens
+   `book_url` in a new tab. Cross-check one or two placements against the
+   Chart tab's own output for the same birth details: `sign` must agree
+   exactly with the D1 tab's sign for that planet, and `house` must agree
+   exactly with the **Bhava Chalit** tab's `house` value for that planet
+   (not the D1 tab's house number -- those can legitimately differ now,
+   see the update banner at the top of this doc).
 3. Compute the chart and check all **four reference views**, each with an
    actual chart-wheel diagram (not just a table): D1 shows each planet's
    `rasi_house` and its wheel boxes use whole-sign houses from the

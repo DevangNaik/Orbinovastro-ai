@@ -89,7 +89,11 @@ class TeaserPlacementOut(BaseModel):
     code: str = Field(description="Asc, or one of the 9 planet codes (Su/Mo/Ma/Me/Ju/Ve/Sa/Ra/Ke)")
     name: str
     sign: str
-    house: int = Field(description="Classical D1/Rasi whole-sign house (1-12), from the ascendant's own sign")
+    house: int = Field(description="Cuspal (Bhava Chalit / Nirayana bhava) house (1-12) -- same "
+        "convention as /api/chart's own `house` field and this engine's KP significators/paid "
+        "scoring. `sign` is separately D1/Rasi-based; the two systems can legitimately differ, "
+        "sometimes by a full house across the whole chart when the Ascendant sits close to a "
+        "sign boundary")
     retrograde: bool
     governs: str = Field(description="Short signification label, from the client's own real HIT_CALC wording")
     house_domain: str = Field(description="Short house life-area label, from the client's own real HIT_CALC wording")
@@ -121,9 +125,17 @@ class TeaserOut(BaseModel):
     )
     book_url: str
     disclaimer: str = (
-        "A free preview only -- the D1 (Rasi) chart's placement structure: "
-        "which sign and house every planet occupies, and which of this "
-        "practice's own real house/planet domains that activates. All "
+        "A free preview only -- which sign and house every planet occupies, "
+        "and which of this practice's own real house/planet domains that "
+        "activates. Sign (rashi) is your D1 (Rasi) birth chart placement. "
+        "House (bhava) is cuspal (Bhava Chalit / Nirayana bhava) -- the same "
+        "house convention this practice's KP significators and the paid "
+        "Diagnostic Report's scoring use -- so a planet's house can differ "
+        "from a simple whole-sign count: sometimes just one placement near a "
+        "house cusp, and when the Ascendant itself sits close to a sign "
+        "boundary, sometimes every placement shifted by a full house at "
+        "once. Neither number is wrong -- they're two established, valid "
+        "conventions answering slightly different questions. All "
         "positions are Nirayana (sidereal), from the validated mechanical "
         "layer. Deliberately does NOT include KP significators (see the "
         "beta significators feature), dasha/bhukti timing, or the "

@@ -99,25 +99,46 @@ def test_placements_include_ascendant_plus_all_nine_planets():
     assert len(teaser.placements) == 10
 
 
-def test_placement_houses_match_chart_to_dicts_rasi_house_independently():
-    """Cross-checks teaser.py's own house-placement arithmetic against
-    engine/chart.py's already-tested rasi_house field, computed via a
-    completely separate code path (chart_to_dict), for the client's real
-    reference chart."""
+def test_placement_houses_match_chart_to_dicts_cuspal_house_independently():
+    """Cross-checks teaser.py's own house-placement lookup against
+    engine/chart.py's already-tested cuspal `house` field (Bhava Chalit /
+    Nirayana bhava -- the same convention /api/chart and KP significators
+    use), computed via a completely separate code path (chart_to_dict),
+    for the client's real reference chart. The Preview's house switched
+    from whole-sign (rasi_house) to cuspal per the client's explicit
+    request that bhava reflect the cuspal/Nirayana system while rashi
+    (sign, checked separately below) stays D1-based."""
     chart = _real_client_reference_chart()
     teaser = build_teaser(chart)
     as_dict = chart_to_dict(chart)
 
     assert next(p for p in teaser.placements if p.code == "Asc").house == 1
 
-    rasi_house_by_code = {p["code"]: p["rasi_house"] for p in as_dict["planets"]}
+    cuspal_house_by_code = {p["code"]: p["house"] for p in as_dict["planets"]}
     for placement in teaser.placements:
         if placement.code == "Asc":
             continue
-        assert placement.house == rasi_house_by_code[placement.code], (
+        assert placement.house == cuspal_house_by_code[placement.code], (
             f"{placement.code}: teaser said house {placement.house}, "
-            f"chart_to_dict said rasi_house {rasi_house_by_code[placement.code]}"
+            f"chart_to_dict said cuspal house {cuspal_house_by_code[placement.code]}"
         )
+
+
+def test_placement_signs_match_chart_to_dicts_sign_field_independently():
+    """Sign (rashi) must stay D1/Rasi-based and unaffected by the cuspal
+    house switch above -- cross-checked against chart_to_dict's own
+    `sign` field for the same reference chart."""
+    chart = _real_client_reference_chart()
+    teaser = build_teaser(chart)
+    as_dict = chart_to_dict(chart)
+
+    assert next(p for p in teaser.placements if p.code == "Asc").sign == as_dict["ascendant"]["sign"]
+
+    sign_by_code = {p["code"]: p["sign"] for p in as_dict["planets"]}
+    for placement in teaser.placements:
+        if placement.code == "Asc":
+            continue
+        assert placement.sign == sign_by_code[placement.code]
 
 
 def test_every_placement_narrative_uses_the_clients_real_labels():
