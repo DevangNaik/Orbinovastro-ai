@@ -87,12 +87,31 @@ sign. Deliberately kept OUT of `ephemeris.compute_natal_chart`'s own
 field instead, so every classical-9-planet-only consumer of
 `compute_natal_chart` (teaser.py, kp.py significators, varga.py D9,
 ccsi.py/hit_calc.py CCSI scoring, dasha.py) is completely unaffected --
-only this function merges them into the /api/chart response."""
+only this function merges them into the /api/chart response.
+
+UPDATE (2026-09-24, newest): added `planet_element` and `rashi_element` to
+every planet, the Ascendant, and the outer planets -- client-requested, for
+coloring each chart-wheel planet label by the planet's own fixed classical
+Pancha Tattva element (Fire/Water/Earth/Air/Ether -- see
+chart_narrative.PLANET_ELEMENT's own comment), NOT by the element of
+whichever sign it's currently transiting (that's the separate
+`rashi_element` field, e.g. Mars in Cancer keeps a Fire `planet_element`
+even though Cancer's own `rashi_element` is Water -- both are exposed so
+the frontend can compute an `element_match` comparison itself if it wants
+to describe the relationship, but per the client's explicit instruction
+`rashi_element` must never be used to choose the label's color).
+`planet_element` is null for Rahu/Ketu/Uranus/Neptune/Pluto (no classical
+Pancha Tattva rulership exists for these -- deliberately not inferred from
+their current sign) and for the Ascendant (not a planet). `rashi_element`
+is always present for every entry including the Ascendant and the outer
+planets, since it only depends on which sign is occupied, not on planetary
+rulership."""
 from __future__ import annotations
 
 from .chart_narrative import (
     aspected_by_for_point, functional_nature, is_vargottama, natal_aspects,
-    natal_conjunctions, planet_flags, planet_nature, position_meaning,
+    natal_conjunctions, planet_element, planet_flags, planet_nature,
+    position_meaning, rashi_element,
 )
 from .ephemeris import (
     BirthMoment, NatalChart, compute_natal_chart, nakshatra_for_longitude,
@@ -147,6 +166,8 @@ def chart_to_dict(chart: NatalChart) -> dict:
             "meaning": position_meaning(chart.ascendant.sign, asc_nakshatra, asc_pada),
             "flags": asc_flags,
             "aspected_by": asc_aspected_by,
+            "planet_element": None,
+            "rashi_element": rashi_element(chart.ascendant.sign),
         },
         "houses": [
             {
@@ -182,6 +203,8 @@ def chart_to_dict(chart: NatalChart) -> dict:
                 ),
                 "aspects": aspects_by_code[p.code]["aspects"],
                 "aspected_by": aspects_by_code[p.code]["aspected_by"],
+                "planet_element": planet_element(p.code),
+                "rashi_element": rashi_element(p.sign),
             }
             for p in chart.planets
         ] + [
@@ -216,6 +239,13 @@ def chart_to_dict(chart: NatalChart) -> dict:
                 ),
                 "aspects": [],
                 "aspected_by": [],
+                # No classical Pancha Tattva rulership for the outer
+                # planets either -- null, not inferred from their current
+                # sign (see chart_narrative.PLANET_ELEMENT's own comment).
+                # rashi_element is still real: it only depends on which
+                # sign they're in, not on planetary rulership.
+                "planet_element": planet_element(p.code),
+                "rashi_element": rashi_element(p.sign),
             }
             for p in chart.outer_planets
         ],

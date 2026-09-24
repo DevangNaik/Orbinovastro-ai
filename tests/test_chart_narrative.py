@@ -16,7 +16,8 @@ from app.engine.chart_narrative import (
     BENEFIC_PLANETS, MALEFIC_PLANETS, NAKSHATRA_THEMES, SIGN_TRAITS,
     angular_separation, aspected_by_for_point, dignity_flag,
     functional_nature, houses_ruled_by, is_vargottama, natal_aspects,
-    natal_conjunctions, planet_flags, planet_nature, position_meaning,
+    natal_conjunctions, planet_element, planet_flags, planet_nature,
+    position_meaning, rashi_element,
 )
 from app.engine.ephemeris import (
     BirthMoment, compute_natal_chart, sign_index_for_longitude,
@@ -412,3 +413,70 @@ def test_chart_to_dict_wires_functional_nature_for_every_planet():
             assert p["functional_nature"] is None
         else:
             assert p["functional_nature"] in ("Benefic", "Malefic")
+
+
+# --- planet_element / rashi_element (2026-09-24, newest) -- client-
+# requested for coloring each chart-wheel planet label by the planet's
+# own FIXED classical Pancha Tattva element, deliberately independent of
+# whichever sign it's currently transiting (that's the separate
+# rashi_element field) -- see chart_narrative.py's own comment.
+
+def test_planet_element_fixed_classical_mapping():
+    assert planet_element("Su") == "Fire"
+    assert planet_element("Ma") == "Fire"
+    assert planet_element("Mo") == "Water"
+    assert planet_element("Ve") == "Water"
+    assert planet_element("Me") == "Earth"
+    assert planet_element("Sa") == "Air"
+    assert planet_element("Ju") == "Ether"
+
+
+def test_planet_element_is_none_for_nodes_and_outer_planets():
+    # Client's own explicit instruction (2026-09-24): no classical
+    # rulership exists for these five, so this must be None/unassigned,
+    # never guessed or inferred from their current sign.
+    for code in ("Ra", "Ke", "Ur", "Ne", "Pl"):
+        assert planet_element(code) is None
+
+
+def test_rashi_element_covers_all_twelve_signs():
+    expected = {
+        "Aries": "Fire", "Leo": "Fire", "Sagittarius": "Fire",
+        "Taurus": "Earth", "Virgo": "Earth", "Capricorn": "Earth",
+        "Gemini": "Air", "Libra": "Air", "Aquarius": "Air",
+        "Cancer": "Water", "Scorpio": "Water", "Pisces": "Water",
+    }
+    for sign, element in expected.items():
+        assert rashi_element(sign) == element
+
+
+def test_planet_element_does_not_change_with_current_sign():
+    """Regression for the client's own example: Mars in Cancer (a Water
+    sign) must still report a Fire planet_element -- the two fields are
+    completely independent. Uses the real reference chart, where three
+    planets genuinely land in a different-element sign than their own
+    fixed element (Sun in Virgo/Earth, Mercury in Libra/Air, Jupiter in
+    Capricorn/Earth) -- not a hypothetical, real data from this
+    engagement's own validated reference chart."""
+    chart = _real_client_reference_chart()
+    data = chart_to_dict(chart)
+    by_code = {p["code"]: p for p in data["planets"]}
+    mismatches = {"Su": ("Fire", "Earth"), "Me": ("Earth", "Air"), "Ju": ("Ether", "Earth")}
+    for code, (expected_planet_element, expected_rashi_element) in mismatches.items():
+        assert by_code[code]["planet_element"] == expected_planet_element
+        assert by_code[code]["rashi_element"] == expected_rashi_element
+        assert by_code[code]["planet_element"] != by_code[code]["rashi_element"]
+
+
+def test_chart_to_dict_wires_planet_element_and_rashi_element_for_every_entry():
+    chart = _real_client_reference_chart()
+    data = chart_to_dict(chart)
+    for p in data["planets"]:
+        assert "rashi_element" in p and p["rashi_element"] in ("Fire", "Water", "Earth", "Air")
+        if p["code"] in ("Ra", "Ke", "Ur", "Ne", "Pl"):
+            assert p["planet_element"] is None
+        else:
+            assert p["planet_element"] in ("Fire", "Water", "Earth", "Air", "Ether")
+    asc = data["ascendant"]
+    assert asc["planet_element"] is None
+    assert asc["rashi_element"] in ("Fire", "Water", "Earth", "Air")

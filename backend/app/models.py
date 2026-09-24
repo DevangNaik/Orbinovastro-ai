@@ -96,6 +96,22 @@ class PlanetOut(BaseModel):
         description="The reverse of `aspects`: which other planets cast a classical graha "
         "drishti onto this one.",
     )
+    planet_element: str | None = Field(
+        default=None,
+        description="'Fire' / 'Water' / 'Earth' / 'Air' / 'Ether' / null -- the planet's own "
+        "FIXED classical Pancha Tattva element (Su/Ma=Fire, Mo/Ve=Water, Me=Earth, Sa=Air, "
+        "Ju=Ether), independent of which sign it currently occupies. Intended for coloring "
+        "this planet's chart-wheel label. Null for Rahu/Ketu/Uranus/Neptune/Pluto -- no "
+        "classical rulership exists for these, and it is deliberately not inferred from "
+        "their current sign.",
+    )
+    rashi_element: str = Field(
+        description="'Fire' / 'Water' / 'Earth' / 'Air' -- the classical element of the SIGN "
+        "this planet currently occupies (e.g. Capricorn = Earth). A completely separate fact "
+        "from `planet_element` above -- e.g. Mars in Cancer has `planet_element: 'Fire'` and "
+        "`rashi_element: 'Water'` at the same time, and that mismatch is intentional, not a "
+        "bug. Never use this field to choose a planet's label color; use `planet_element`.",
+    )
 
 
 class HouseOut(BaseModel):
@@ -129,6 +145,15 @@ class AscendantOut(BaseModel):
         "The Ascendant never casts an aspect of its own (it isn't a graha), so unlike a "
         "planet's entry there is no `aspects` field here.",
     )
+    planet_element: str | None = Field(
+        default=None,
+        description="Always null -- the Ascendant isn't a planet, so it has no Pancha Tattva "
+        "rulership of its own.",
+    )
+    rashi_element: str = Field(
+        description="'Fire' / 'Water' / 'Earth' / 'Air' -- the classical element of the sign "
+        "the Ascendant itself falls in (same concept as a planet's `rashi_element`).",
+    )
 
 
 class ChartOut(BaseModel):
@@ -155,7 +180,12 @@ class ChartOut(BaseModel):
         "'functional_nature' is a separate, chart-specific BETA "
         "classification (standard kendra/trikona/dusthana house-lordship "
         "rule) -- distinct from 'nature', which is fixed and never "
-        "changes chart to chart."
+        "changes chart to chart. Each entry's 'planet_element' is its "
+        "own fixed classical Pancha Tattva element (null for Rahu/Ketu/"
+        "Uranus/Neptune/Pluto/the Ascendant); 'rashi_element' is the "
+        "separate, always-present element of whichever sign it currently "
+        "occupies -- the two can disagree (e.g. Mars in Cancer), which is "
+        "intentional, not an error."
     )
 
 

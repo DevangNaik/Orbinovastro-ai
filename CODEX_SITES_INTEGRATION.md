@@ -429,6 +429,176 @@ pieces of client feedback, read together:
    Cuspal) -- same as every other wheel-formatting rule in this section,
    they all share one rendering path.
 
+**UPDATE (2026-09-24, newest again) — full, authoritative planet-label
+content/placement/order/color rules, from the client's own detailed
+spec.** This consolidates and, in two places, corrects earlier pieces of
+this section (marked below) -- it is the source of truth for what a
+wheel's planet label says and looks like. Build every piece of the label
+from calculated `/api/chart` fields; never parse it back out of an
+already-formatted string.
+
+1. **Placement.** Unchanged from above: the box is chosen by D1 sign
+   placement (`wholeSignHouseList`/`rasi_house` for D1, the equivalent
+   per-chart-type mapping for the other three views). The small numeral
+   printed in that box is the sign's fixed **Rashi number** (point 1 of
+   the UPDATE box just above) -- never a house number. House number is a
+   separate, derived fact (from the Ascendant plus sign placement),
+   already exposed via `house`/`rasi_house` and used elsewhere (the
+   Planet Details Table's Sign/House line) -- it is not printed as the
+   box's numeral.
+2. **Main label line**:
+   ```
+   {PlanetAbbrev}{" (R)" if retrograde} {DegreeInSign}°{Minutes}′ {NakshatraAbbrev}{Pada} {ConditionFlags}
+   ```
+   Example: `Ma(R) 12°13′ Asw4 D↓` (Mars, retrograde, 12°13′ into its
+   sign, Ashwini nakshatra pada 4, one condition flag active). Another:
+   `Ju 9°07′ U.A4 D↓` means Jupiter, 9°07′ into Capricorn, Uttara Ashadha
+   pada 4, debilitated -- the label conveys position and condition only;
+   that Capricorn is the 1st house (because this chart's Ascendant is
+   Capricorn) is a separate fact, shown via the Rashi number "10" on the
+   box plus the Planet Details Table's own House column, not squeezed
+   into this string.
+   - `PlanetAbbrev` = the `code` field, or `Asc` for the Ascendant (point 8).
+   - Degree = `degree_in_sign` converted to whole degrees + minutes,
+     rounded consistently to the nearest minute (carry a rollover to the
+     next whole degree if rounding produces 60 minutes).
+   - Nakshatra abbreviation + pada, no space between them (`Rev4`,
+     `Swa4`, `Chi1`) -- see the abbreviation table, point 4.
+   - Condition flags (point 5) appended last, only when true.
+3. **Retrograde shown exactly once.** `(R)` right after the planet code
+   is the ONLY retrograde marker in this label. ~~The compact `R*` flag
+   code~~ **Client-caught bug, fixed here: do NOT also append `R*` to
+   this label's trailing condition flags** -- the engine's `"Retrograde"`
+   flag (compact code `R*`) means exactly the same thing as `(R)`, so a
+   label showing both (as the live wheel currently does: `Ma(R) 12°13'
+   Asw4 R*`) displays retrograde twice. Drop `R*` specifically from the
+   wheel label; the other four compact codes (`C^`/`E↑`/`D↓`/`V▫`) are
+   unaffected. (The Planet Details Table's own Flags line and legend are
+   a separate context with no inline `(R)` of their own to duplicate
+   against -- `R*` stays there unchanged.)
+4. **Nakshatra abbreviations.** No 3-letter table existed in this doc
+   before now; the client's own reference screenshot fixes 10 of the 27:
+   `Ashwini→Asw, Ardra→Ard, Chitra→Chi, Hasta→Has, Swati→Swa,
+   Anuradha→Anu, Mula→Moo, Uttara Ashadha→U.A, Shravana→Sra,
+   Revati→Rev`. The remaining 17 are **NOT yet confirmed against any
+   client source** -- proposed as a deterministic extension of the same
+   visible pattern (first 3 letters of the common spelling; the six
+   Purva/Uttara-prefixed pairs instead use `P.`/`U.` + the first letter
+   of the second word, matching `U.A` above): `Bharani→Bha,
+   Krittika→Kri, Rohini→Roh, Mrigashira→Mrg, Punarvasu→Pun, Pushya→Pus,
+   Ashlesha→Asl, Magha→Mag, Purva Phalguni→P.P, Uttara Phalguni→U.P,
+   Vishakha→Vis, Jyeshtha→Jye, Purva Ashadha→P.A, Dhanishta→Dha,
+   Shatabhisha→Sha, Purva Bhadrapada→P.B, Uttara Bhadrapada→U.B`.
+   **BETA for these 17 specifically** -- flag to the client for
+   confirmation against whatever tool produced their reference
+   screenshot; swap in their exact values if theirs differ, same
+   discipline as this engagement's other not-yet-client-confirmed
+   conventions (e.g. `functional_nature`).
+5. **Condition flags** (`D↓` debilitated, `E↑` exalted, `C^` combust,
+   `V▫` vargottama) -- straight from the `flags` array (minus
+   `R*`/Retrograde, point 3), shown only when that specific flag is
+   present for that entry. Never inferred from the label's color (point
+   6) -- two fully independent pieces of information.
+6. **Label color = the planet's own fixed classical ELEMENT, not Nature,
+   not planet identity.** This point has now been corrected TWICE by the
+   client in quick succession, in this order -- kept visible so the
+   history is legible, not because either intermediate version should be
+   built:
+   - ~~Each planet's (and the Ascendant's) in-box label renders as its
+     own chip with background = that body's own accent color~~
+     **SUPERSEDED #1** (per-planet-identity color -- see the strikethrough
+     note at the "Planet color scheme" section below).
+   - ~~Color the wheel label from the entry's `nature` field
+     (`"Malefic"`/`"Benefic"`), reusing the Nature badge's existing
+     colors~~ **SUPERSEDED #2** -- the client's very next message replaced
+     this with element-based coloring, below. If Nature-based coloring
+     was already built from an earlier version of this doc, replace it.
+
+   **Current, final rule:** color the wheel label from two NEW fields
+   `/api/chart` now returns on every planet, the Ascendant, and the outer
+   planets -- `planet_element` and `rashi_element` -- which are
+   deliberately two separate facts, never to be confused:
+   - `planet_element` -- the planet's own FIXED classical Pancha Tattva
+     element, the same for that planet on every chart, regardless of
+     which sign it's currently in: `Su`/`Ma` → Fire, `Mo`/`Ve` → Water,
+     `Me` → Earth, `Sa` → Air, `Ju` → Ether/Space. `null` for
+     `Ra`/`Ke`/`Ur`/`Ne`/`Pl` and for the Ascendant -- no classical
+     rulership exists for these five bodies (nodes and outer planets),
+     and none for the Ascendant (it isn't a planet); render these with
+     one neutral/muted label color, not a guessed element.
+   - `rashi_element` -- the element of whichever SIGN that entry
+     currently occupies (`Aries`/`Leo`/`Sagittarius` → Fire,
+     `Taurus`/`Virgo`/`Capricorn` → Earth, `Gemini`/`Libra`/`Aquarius` →
+     Air, `Cancer`/`Scorpio`/`Pisces` → Water) -- always present, even
+     for the Ascendant and the outer planets, since it only depends on
+     the sign, not on planetary rulership.
+   - **Use `planet_element` for the label's color. Never `rashi_element`.**
+     A planet's label color must NOT change depending on which sign it's
+     transiting through -- e.g. Mars in Cancer keeps its Fire-colored
+     label even though Cancer's own `rashi_element` is Water; this
+     mismatch is intentional and meaningful (not a bug to "fix" into
+     agreement). Real example from this engagement's own reference
+     chart: Sun sits in Virgo (`rashi_element: "Earth"`) but still has
+     `planet_element: "Fire"`, and its label must render Fire's color.
+   - Adopt 5 distinct colors for Fire/Water/Earth/Air/Ether, plus one
+     neutral/muted color for `null` (nodes, outer planets, Ascendant) --
+     from orbinovastro.com's own palette, consistent everywhere a planet
+     label appears in the wheel.
+   - **`element_match`** (optional): if any part of the UI wants to
+     describe the relationship between a planet's own element and the
+     sign it's currently in (e.g. a tooltip or narrative line), compute
+     it client-side as `planet_element === rashi_element` (both
+     non-null) -- this is NOT a field `/api/chart` returns; derive it
+     from the two fields above if and when the UI needs it, and never
+     use it (or `rashi_element`) to pick the label's color.
+   - Condition flags (point 5) and dignity/retrograde/combust/vargottama
+     stay completely independent of this element color -- never let one
+     override or imply the other.
+   - **Scope note:** this element-based rule is specifically for the
+     wheel's planet-label color. The separate "Planet color scheme"
+     section below (distinct per-planet hues, used for planet code/name
+     coloring in the Planet Details Table and the Preview placements
+     table) still stands as its own, different rule unless the client
+     says otherwise -- flag it back to the client if they intended
+     element-based coloring to replace that too, rather than assuming so
+     silently.
+7. **Ordering when a box holds more than one occupant.** Stack each
+   occupant on its own line (already specified), ordered by the fixed
+   classical sequence -- Ascendant first if present, then `Su, Mo, Ma,
+   Me, Ju, Ve, Sa, Ra, Ke, Ur, Ne, Pl`, skipping whichever aren't present
+   in that box -- **not** sorted by degree. Confirmed against the
+   client's own reference chart: house 6 there shows `Su → Ur → Pl` (not
+   degree order -- Pl's 11°22′ is actually the lowest of the three) and
+   house 3 shows `Sa → Ke`, both matching this fixed sequence, not
+   degree order. Keep every stacked label fully inside the box, no
+   overlap (already specified above).
+8. **Ascendant.** `Asc {DegreeInSign}°{Minutes}′ {NakshatraAbbrev}{Pada}`
+   -- a real position, nakshatra, and pada (from `/api/chart`'s
+   `ascendant` object), but never a retrograde `(R)` or a combust/dignity
+   flag (it isn't a planet). Use the neutral color from point 6.
+9. **Uranus/Neptune/Pluto.** Same positional label format as any planet
+   -- but mark them "supplementary" in the wheel's legend (e.g. a
+   footnote: "Ur/Ne/Pl: position shown for reference; no classical
+   Nature, dignity, KP rulership, or graha-drishti aspects are assigned
+   to them"), always the neutral color from point 6 (`planet_element` is
+   `null` for these three, same as it is for Nature), and never draw an
+   aspect line to/from them through this label -- consistent with the
+   engine, which already returns `nature: ""` and empty
+   `aspects`/`aspected_by` for these three.
+10. **Legend, updated to cover all of the above** -- one compact key
+    near each wheel (or once for the page): (a) the `planet_element`
+    color mapping from point 6 (five swatches -- Fire/Water/Earth/Air/
+    Ether -- plus a neutral swatch for `null`, e.g. labeled "N/A"), (b)
+    the four remaining condition-flag codes (`C^`/`E↑`/`D↓`/`V▫` -- `R*`
+    excluded per point 3), and (c) the Rashi-number-to-sign mapping
+    (previous UPDATE box's point 2), if that legend line was added.
+    House meaning and aspect interpretation belong in the Planet Details
+    Table's Meaning/Aspects columns (already specified) -- never
+    squeezed into this label.
+
+Applies to all four chart views (D1, Bhava Chalit, D9, Cuspal) -- same
+shared rendering path as the rest of this section.
+
 **CORRECTED 2026-09-24 (latest) — the polygon table below was mirrored left-right; if Codex already built the wheel from the old table, replace it with this corrected one.** The client sent a real Horosoft screenshot and their own Excel Kundli chart as the standard-practice reference and pointed out the live wheel was flipped — concretely, house 4 (and everything on "that side") was drawn on the right when it belongs on the left (and vice versa for the other side). Root cause, confirmed by re-deriving the geometry from the client's own reference: the original table numbered the 12 boxes going **clockwise** from the top box (1→2 upper-right→3→4 right kite→...→10 left kite→...), but the correct, standard North Indian convention numbers them going **counter-clockwise** from the top (1→2 upper-**left**→3→4 **left** kite→...→10 **right** kite→...). This was independently confirmed against the client's own real Excel chart: house 4 (Aries, containing Mars for the reference birth chart) sits in the **left** kite there, and house 10 (Libra, containing Mercury) sits in the **right** kite — the opposite of what the old table drew. **The fix is a simple mirror**: every polygon/label coordinate below has its x mirrored (`x → 400 − x`) from the original table, with the same house numbers — nothing else about the geometry, the box shapes, or the sign-placement logic changes.
 
 This is the same North Indian diamond-chart algorithm already built, tested,
@@ -832,6 +1002,20 @@ down for the full shape):
   Rahu/Ketu and for Uranus/Neptune/Pluto — dash. Render as its own small
   badge right next to the Nature badge, labeled distinctly (e.g.
   "Functional: Benefic"), never merged into one badge with `nature`.
+- `planet_element` / `rashi_element` — **new**, both `"Fire"`/`"Water"`/
+  `"Earth"`/`"Air"`/(`planet_element` only) `"Ether"`. `planet_element` is
+  the planet's own FIXED classical element (Su/Ma=Fire, Mo/Ve=Water,
+  Me=Earth, Sa=Air, Ju=Ether) — `null` for Ra/Ke/Ur/Ne/Pl and for the
+  Ascendant (no classical rulership; not inferred from their sign).
+  `rashi_element` is the element of whichever sign that entry currently
+  occupies — always present, including for the Ascendant and the outer
+  planets. **These drive the chart-wheel planet label's color** (see the
+  "D1 planet-label rules" UPDATE box in the "Chart wheel diagram" section
+  above for the full rule and worked examples) — use `planet_element`
+  for that, never `rashi_element`; the two can and do disagree for the
+  same planet (e.g. this engagement's own reference chart has the Sun in
+  Virgo: `"planet_element": "Fire", "rashi_element": "Earth"`), and
+  that's intentional, not a bug.
 
 **A single planet-details table, one row per planet** (Ascendant + 12
 planets — the classical 9 grahas plus Uranus/Neptune/Pluto — same order
@@ -851,6 +1035,42 @@ using that chart type's own house-numbering convention in the
 `navamsa_house` for D9, cusp number for Cuspal — same house-field rule as
 the wheel itself, see above, and see the UPDATE box's point 7).
 
+**UPDATE (2026-09-24, newest) — planet labels inside the wheel should be
+colored, bordered background chips, not just colored text.** The client
+sent a new reference screenshot of their own live D1 wheel (via a
+different rendering tool) showing each planet's in-box label as a small
+filled rounded chip -- a light background tint in that planet's own
+color with a thin border in a deeper shade of the same color -- stacked
+one chip per occupying planet/Ascendant when a box holds more than one
+(e.g. house 6 in the reference has three separate stacked chips: Sun,
+Uranus, Pluto, each its own color). This is IN ADDITION to the
+already-specified per-planet distinct hue and the element-tinted house-box
+background below -- both stay exactly as specified; this just changes
+*how* each planet's own color is applied to its label (a filled, bordered
+chip) rather than plain colored text on a transparent background:
+- Each planet's (and the Ascendant's) in-box label renders as its own
+  small chip: rounded-corner rectangle, background = that body's accent
+  color at a light tint (e.g. ~15-20% opacity, so it stays readable and
+  pastel, not a solid saturated fill), border = the same accent color at
+  full/deeper saturation, text = the planet's usual label content and
+  color (the compact `Code(R) DD°MM'` format already specified above).
+- When a box holds more than one occupant, stack their chips vertically
+  with a small gap between them (as in the reference) -- each chip keeps
+  its own planet's color, they don't merge into one shared chip.
+- The house box's own Fire/Earth/Air/Water element-tinted background
+  (below) stays underneath these chips, unchanged -- the two are
+  independent layers, not a replacement for one another. (The client's
+  reference screenshot happens to show plain white boxes behind the
+  chips; per the client's own confirmation, that's just how that
+  particular tool renders it, not an instruction to drop the element
+  tint here -- same treatment as the earlier "third-party reference"
+  caveat elsewhere in this doc.)
+- Apply the same chip treatment everywhere else a planet's color already
+  appears per the "Planet color scheme" bullet below (the Planet Details
+  Table, the Preview's placements table) only if it reads well there too
+  -- your call on carrying it beyond the wheel itself, since the client's
+  ask was specifically about the wheel's in-box labels.
+
 **Planet color scheme.** Adopt one consistent accent color per planet,
 reused everywhere that planet's code or name appears on the page (inside
 the chart wheel boxes, in this table, in the Preview's placements table,
@@ -863,7 +1083,9 @@ site's theme) but keep the same STRUCTURE the client's reference uses:
 - A distinct hue per body: Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn,
   Rahu, Ketu, Uranus, Neptune, and Pluto (twelve total now — see the
   UPDATE box at the top of the previous section) each get their own
-  color, consistent across every place they're rendered on the page.
+  color, consistent across every place they're rendered on the page. As
+  of the UPDATE box just above, inside the wheel this renders as a
+  bordered background chip in that color, not plain colored text.
 - A light background tint per house box keyed to that box's sign's
   classical element (fire: Aries/Leo/Sagittarius, earth: Taurus/Virgo/
   Capricorn, air: Gemini/Libra/Aquarius, water: Cancer/Scorpio/Pisces) —
@@ -872,7 +1094,9 @@ site's theme) but keep the same STRUCTURE the client's reference uses:
   sign belongs to is standard, universally-agreed classical astrology, not
   proprietary), so a small legend line near the wheel ("Fire · Earth · Air ·
   Water", matching the client's own reference) is a nice touch but not
-  required.
+  required. **Stays in place under the new per-planet chips (see the
+  UPDATE box above) -- confirmed with the client, 2026-09-24, this is not
+  being dropped.**
 - The ascendant's own house box keeps its existing subtle highlight fill
   (already specified above) on top of its element tint, so it still reads
   as visually distinct from the other eleven boxes.
@@ -977,7 +1201,8 @@ Response (`ChartOut`):
     "degree_in_sign": 24.8, "nakshatra": "Dhanishta", "nakshatra_lord": "Ma", "pada": 3,
     "meaning": "Dhanishta(3): rhythm, recognition, and a pull toward group achievement; Capricorn adds disciplined and patient.",
     "flags": [],
-    "aspected_by": [{"code": "Ma", "aspect": "4th"}]
+    "aspected_by": [{"code": "Ma", "aspect": "4th"}],
+    "planet_element": null, "rashi_element": "Earth"
   },
   "houses": [ {"house": 1, "longitude": 294.8, "sign": "Capricorn", "sign_lord": "Sa"}, "... 12 total, houses 1-12" ],
   "planets": [
@@ -992,8 +1217,11 @@ Response (`ChartOut`):
       "functional_nature": "Malefic",
       "flags": [],
       "aspects": [{"code": "Ju", "aspect": "9th"}],
-      "aspected_by": [{"code": "Ma", "aspect": "7th"}]
+      "aspected_by": [{"code": "Ma", "aspect": "7th"}],
+      "planet_element": "Fire", "rashi_element": "Earth"
     },
+    "... note Sun here is a real example of planet_element != rashi_element",
+    "... (Fire vs. Earth) -- intentional, see the wheel-label color rule above",
     "... 9 classical grahas total: Su, Mo, Ma, Me, Ju, Ve, Sa, Ra, Ke — a planet in its",
     "... sign of debilitation would instead show e.g. \"flags\": [\"Debilitated\"]",
     {
@@ -1003,10 +1231,12 @@ Response (`ChartOut`):
       "retrograde": false, "house": 8, "rasi_house": 9,
       "meaning": "Chitra(2): craftsmanship and a natural sense of design or charisma; Virgo adds careful and detail-driven.",
       "conjunctions": [], "nature": "", "functional_nature": null,
-      "flags": [], "aspects": [], "aspected_by": []
+      "flags": [], "aspects": [], "aspected_by": [],
+      "planet_element": null, "rashi_element": "Earth"
     },
     "... plus Ne, Pl the same shape — real position/meaning/flags, dash",
-    "... (empty/null) for nature/functional_nature/conjunctions/aspects/aspected_by"
+    "... (empty/null) for nature/functional_nature/conjunctions/aspects/aspected_by,",
+    "... planet_element also null (no classical rulership) but rashi_element still real"
   ],
   "disclaimer": "Mechanical-layer chart only: ... (show this to the user)"
 }
@@ -1405,7 +1635,15 @@ something Codex needs to handle.
    planet the two badges show DIFFERENT values (e.g. this engagement's
    real reference chart has Jupiter as natural Benefic but functional
    Malefic) — if they always match, functional_nature likely isn't wired
-   up, it's silently mirroring nature instead.
+   up, it's silently mirroring nature instead; (h) each planet's
+   chart-wheel label is colored by `planet_element` (five colors: Fire/
+   Water/Earth/Air/Ether, plus neutral for Rahu/Ketu/Uranus/Neptune/
+   Pluto/the Ascendant) — for this engagement's real reference chart, the
+   Sun (in Virgo) must show its Fire color, NOT an Earth color, even
+   though Virgo itself is an Earth sign (`rashi_element: "Earth"`) — if
+   the Sun's label is colored like an Earth-element planet, `rashi_element`
+   was used instead of `planet_element` by mistake; the element legend
+   (5 colors + neutral) must be visible near the wheel.
 4. Compute KP significators for the same birth details — the "beta" label
    must be visible.
 5. Try the transit view with no date (defaults to now) and with a specific

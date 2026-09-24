@@ -398,6 +398,59 @@ def functional_nature(code: str, ascendant_sign_index: int) -> str | None:
     return planet_nature(code)
 
 
+# Pancha Tattva (classical 5-element) planetary rulership -- standard
+# Vedic astrology, not proprietary: Agni/Fire rules Sun and Mars, Jal/Water
+# rules Moon and Venus, Prithvi/Earth rules Mercury, Vayu/Air rules Saturn,
+# and Akash/Ether(Space) rules Jupiter. The lunar nodes (Rahu/Ketu) and the
+# outer planets (Uranus/Neptune/Pluto) have no classical Pancha Tattva
+# rulership at all -- deliberately absent from this dict rather than
+# guessed, per the client's own explicit instruction (2026-09-24): "Rahu,
+# Ketu, Uranus, Neptune, and Pluto require an explicit element mapping
+# from my system. Until that mapping is configured, use a neutral label
+# and mark their planet element as unassigned. Do not infer it from their
+# current sign." `planet_element()` below returns None for these five,
+# and for any other unrecognized code, rather than guessing.
+PLANET_ELEMENT: dict[str, str] = {
+    "Su": "Fire", "Ma": "Fire",
+    "Mo": "Water", "Ve": "Water",
+    "Me": "Earth",
+    "Sa": "Air",
+    "Ju": "Ether",
+}
+
+# The classical element of a RASHI (zodiac sign) itself -- a completely
+# separate concept from a planet's own fixed elemental rulership above.
+# Deliberately kept as two independent lookups (2026-09-24): the client
+# was explicit that a planet's label color must come from its own fixed
+# element (PLANET_ELEMENT), never from the element of whichever sign it
+# happens to be transiting through -- e.g. Mars in Cancer (a Water sign)
+# still gets a Fire-colored label, and this is intentional, not a bug.
+RASHI_ELEMENT: dict[str, str] = {
+    "Aries": "Fire", "Leo": "Fire", "Sagittarius": "Fire",
+    "Taurus": "Earth", "Virgo": "Earth", "Capricorn": "Earth",
+    "Gemini": "Air", "Libra": "Air", "Aquarius": "Air",
+    "Cancer": "Water", "Scorpio": "Water", "Pisces": "Water",
+}
+
+
+def planet_element(code: str) -> str | None:
+    """The planet's own fixed classical element ('Fire'/'Water'/'Earth'/
+    'Air'/'Ether'), independent of which sign it currently occupies. None
+    for Rahu/Ketu/Uranus/Neptune/Pluto (and the Ascendant, which isn't a
+    planet) -- no classical rulership exists for these, and the client
+    asked that this NOT be guessed or inferred from their current sign
+    until they provide an explicit mapping."""
+    return PLANET_ELEMENT.get(code)
+
+
+def rashi_element(sign: str) -> str:
+    """The classical element of a rashi (zodiac sign) itself -- e.g.
+    Capricorn -> 'Earth'. Always defined for all 12 signs; see
+    RASHI_ELEMENT's own comment for why this is kept separate from
+    planet_element()."""
+    return RASHI_ELEMENT[sign]
+
+
 def natal_conjunctions(planets: list) -> dict:
     """For each planet (any object/dict-like with .code/.sign/.longitude
     attributes), lists every OTHER planet sharing its same D1 (Rasi) sign
