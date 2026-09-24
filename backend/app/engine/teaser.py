@@ -118,11 +118,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .chart_narrative import NAKSHATRA_THEMES, SIGN_TRAITS
-from .ephemeris import NatalChart, nakshatra_for_longitude, sign_index_for_longitude
+from .chart_narrative import (
+    NAKSHATRA_THEMES, SIGN_TRAITS, _COMBUSTION_ORBS,
+    dignity_flag as _dignity_flag, is_vargottama,
+)
+from .ephemeris import NatalChart, nakshatra_for_longitude
 from .kp import house_of_longitude
 from .overview_report.overview_labels import HOUSE_LIFE_AREAS, PLANET_SIGNIFICATIONS
-from .varga import navamsa_sign_index
 
 DEFAULT_BOOKING_URL = "https://orbinovastro.square.site/s/appointments"
 
@@ -157,33 +159,14 @@ _PLACEMENT_CLOSERS = [
 # latest) so /api/chart can reuse the exact same standard phrase banks for
 # its new `meaning` field -- imported above, not redefined here.
 
-# Standard classical planetary dignity (Uccha/exaltation, Neecha/
-# debilitation, Swakshetra/own sign) for the seven classical grahas --
-# textbook astronomy-adjacent astrology, not proprietary. Deliberately
-# excludes Rahu/Ketu: their dignity convention varies meaningfully across
-# schools (KP vs. Parashari) with no single agreed answer, so asserting one
-# here risks contradicting a visitor's own tradition rather than adding
-# credibility.
-_DIGNITY: dict[str, dict[str, object]] = {
-    "Su": {"exalted": "Aries", "debilitated": "Libra", "own": {"Leo"}},
-    "Mo": {"exalted": "Taurus", "debilitated": "Scorpio", "own": {"Cancer"}},
-    "Ma": {"exalted": "Capricorn", "debilitated": "Cancer", "own": {"Aries", "Scorpio"}},
-    "Me": {"exalted": "Virgo", "debilitated": "Pisces", "own": {"Gemini", "Virgo"}},
-    "Ju": {"exalted": "Cancer", "debilitated": "Capricorn", "own": {"Sagittarius", "Pisces"}},
-    "Ve": {"exalted": "Pisces", "debilitated": "Virgo", "own": {"Taurus", "Libra"}},
-    "Sa": {"exalted": "Libra", "debilitated": "Aries", "own": {"Capricorn", "Aquarius"}},
-}
-
-# Standard (Parashari) combustion orbs in degrees -- how close a planet has
-# to sit to the Sun before classical practice treats it as "combust" (its
-# own signification temporarily overshadowed by the Sun's glare). These are
-# the commonly-cited classical values, NOT read from the client's own
-# workbook (see module docstring). The Sun can't be combust with itself,
-# and the lunar nodes are excluded -- classical combustion is specifically
-# a Sun-proximity effect on a physical planet.
-_COMBUSTION_ORBS: dict[str, float] = {
-    "Mo": 12.0, "Ma": 17.0, "Me": 14.0, "Ju": 11.0, "Ve": 10.0, "Sa": 15.0,
-}
+# _DIGNITY / _COMBUSTION_ORBS / dignity_flag() / is_vargottama() moved to
+# chart_narrative.py (2026-09-24, later still) for the same reason -- see
+# that module's docstring for the real bug this fixed: /api/chart never
+# had access to these tables at all, so the Planet Details Table under the
+# chart-wheel views couldn't show Debilitated/Exalted/Own Sign/Combust/
+# Vargottama for any planet, only the plain retrograde boolean. Imported
+# above as `_COMBUSTION_ORBS`, `_dignity_flag`, `is_vargottama`, not
+# redefined here.
 
 
 def _angular_separation(deg_a: float, deg_b: float) -> float:
@@ -192,22 +175,6 @@ def _angular_separation(deg_a: float, deg_b: float) -> float:
     this module rather than imported from hit_calc.py, which this module
     must never import from (see the AST-level guard test)."""
     return abs((deg_a - deg_b + 180.0) % 360.0 - 180.0)
-
-
-def _dignity_flag(code: str, sign: str) -> str | None:
-    """"Exalted" / "Debilitated" / "Own Sign" / None, for the 7 classical
-    grahas -- the same `_DIGNITY` lookup `_dignity_note` below narrates in
-    prose, exposed here as a short structured flag too."""
-    info = _DIGNITY.get(code)
-    if not info:
-        return None
-    if sign == info["exalted"]:
-        return "Exalted"
-    if sign == info["debilitated"]:
-        return "Debilitated"
-    if sign in info["own"]:
-        return "Own Sign"
-    return None
 
 
 def _dignity_note(code: str, planet_name: str, sign: str) -> str:
@@ -488,10 +455,7 @@ def build_teaser(chart: NatalChart, name: str = "", book_url: str = DEFAULT_BOOK
     asc_gov_label, asc_gov_desc = _split_label(PLANET_SIGNIFICATIONS["Asc"])
     asc_house_label, asc_house_desc = _split_label(HOUSE_LIFE_AREAS[1])
     asc_trait = SIGN_TRAITS.get(asc_sign, "distinctly its own")
-    asc_vargottama = (
-        sign_index_for_longitude(chart.ascendant.longitude)
-        == navamsa_sign_index(chart.ascendant.longitude)
-    )
+    asc_vargottama = is_vargottama(chart.ascendant.longitude)
     asc_flags = ["Vargottama"] if asc_vargottama else []
     asc_narrative = (
         f"Your Ascendant rises in {asc_sign} ({asc_trait}). This practice "
@@ -519,9 +483,7 @@ def build_teaser(chart: NatalChart, name: str = "", book_url: str = DEFAULT_BOOK
         orb = _COMBUSTION_ORBS.get(planet.code)
         separation = _angular_separation(planet.longitude, sun.longitude) if (orb and sun) else 0.0
         combust = bool(orb) and sun is not None and separation <= orb
-        vargottama = (
-            sign_index_for_longitude(planet.longitude) == navamsa_sign_index(planet.longitude)
-        )
+        vargottama = is_vargottama(planet.longitude)
 
         flags: list[str] = []
         if planet.retrograde:
