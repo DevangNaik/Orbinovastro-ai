@@ -424,6 +424,48 @@ table underneath — the wheel and the table should read as one consistent
 system, the way the client's own Excel chart does (colored planet codes
 inside the wheel boxes, the same colors reused in the table beneath it).
 
+**UPDATE (2026-09-24, later still again) — visual reference for the wheel
+itself, from a real third-party chart (Horosoft-style "Lagna Chart") the
+client sent as a formatting example.** This is a LAYOUT/formatting
+reference only — three specific things to adopt from it, and two things
+NOT to drop just because this particular example doesn't show them:
+
+1. **Adopt: a compact per-planet in-box label with degree and retrograde
+   inline**, e.g. `Ma(R) 12°14'` — planet code, a small `(R)` immediately
+   after the code only when `retrograde` is true (not a separate
+   superscript mark), then degree°minute′ (convert `degree_in_sign`'s
+   decimal degrees to whole degrees + minutes — e.g. `12.319` → `12°19'`),
+   in that planet's own accent color. This replaces the plainer "2-letter
+   code + superscript ᴿ" format described just above — use this compact
+   DMS-with-inline-retrograde format instead.
+2. **Adopt: a small house-number numeral near each box's inner
+   (center-ward) vertex** — a subtle gray/muted small number (1–12,
+   matching the polygon table's own house numbering above), positioned
+   close to where that house's polygon point touches the diamond's
+   center, the same way the reference image shows small numbers clustered
+   near the middle of the chart. This is in addition to, not a
+   replacement for, the sign abbreviation and planet labels already
+   specified.
+3. **Adopt: properly centered planet labels within each box.** Stack each
+   box's planet labels (and the sign abbreviation above them) centered
+   both horizontally and vertically around that house's label-anchor
+   coordinate from the polygon table above, with consistent, even line
+   spacing — don't let labels drift toward one edge of the kite/triangle
+   or overlap the box's border, which is what "properly centered" is
+   asking to fix versus whatever the current build renders.
+4. **Do NOT drop: the sign abbreviation line, or the Fire/Earth/Air/Water
+   element-tinted box backgrounds** already specified above and in the
+   "Planet color scheme" section below. This reference example happens to
+   use plain white boxes with no sign label at all — that's simply how
+   that third-party tool renders it, not an instruction to remove either
+   feature from this build. Both stay exactly as already specified.
+5. **Do NOT add Uranus/Neptune/Pluto rows or wheel labels.** The reference
+   image happens to include them (that tool computes all 12 bodies), but
+   this engine still only returns the 9 classical grahas + Ascendant —
+   see the still-open scope note in the "Planet color scheme and the
+   enriched Planet Details Table" section below. Don't render placeholder
+   labels for the three outer planets in the wheel either.
+
 **Which sign goes in which box, per chart type:**
 - **D1**: whole-sign houses starting from the ascendant's own sign. In
   pseudocode:
@@ -453,23 +495,22 @@ inside the wheel boxes, the same colors reused in the table beneath it).
 
 ## Planet color scheme and the enriched Planet Details Table (updated, 2026-09-24 later still)
 
-**UPDATE (2026-09-24, later still, revised again):** the client used the
-live page twice and refined this feedback -- the version below is the
-FINAL, exact spec (superseding an earlier draft of this same box that
-described a single stacked "Planet" cell plus separate Sign/House,
-Nakshatra(Pada), and Conj. columns; that draft is gone, replaced by this
-one). Read this box first, then the full section, which has been rewritten
-to match:
+**UPDATE (2026-09-24, later still again):** the client used the live
+page and refined this feedback further, twice more -- the version below
+is the FINAL, exact spec (superseding an earlier two-column draft of this
+same box; that draft is gone, replaced by this one, now three columns).
+Read this box first, then the full section, which has been rewritten to
+match:
 
-1. **Exactly two columns per planet row, not four-plus.** No separate
-   Sign/House, Degree, Nakshatra(Pada), Flags, or Nature columns any more
-   -- everything folds into these two:
+1. **Exactly three columns per planet row.** No separate Sign/House,
+   Degree, Nakshatra(Pada), Flags, or Nature columns -- those still fold
+   into the first cell as before:
    - **"Planet / Position"** -- stack these four lines vertically in one
-     cell:
+     cell (unchanged from the previous round):
      1. Planet symbol and name (e.g. `Ma Mars`)
      2. Sign and house **for the currently selected chart view** (e.g.
         `Aries · House 4`) -- this is the one line that changes between
-        the D1/Bhava Chalit/D9/Cuspal tabs (see point 6 below for exactly
+        the D1/Bhava Chalit/D9/Cuspal tabs (see point 7 below for exactly
         which field feeds which tab); every other line in this cell is a
         natal fact and stays identical across all four tabs for the same
         planet.
@@ -477,22 +518,33 @@ to match:
      4. Nature and flags together (e.g. `Malefic · Retrograde`, or
         `Malefic · Debilitated · Retrograde` when more than one flag
         applies) -- use the compact flag codes from point 3 below, with a
-        legend.
-   - **"Details"** -- conjunctions first, then the full `meaning`
-     sentence, in that order, both in the same cell. Give this column
-     enough width to show the complete `meaning` sentence without
-     horizontal clipping -- that was the client's specific complaint
-     about the previous (four-plus-column) layout.
-   - Keep every existing value and sentence — this is a re-layout, not a
+        legend, styled as small colored badges/pills consistent with the
+        Nature badges (see the "Planet color scheme" guidance below), not
+        plain text.
+   - **"Conj. / Aspects"** (new, replacing the old "Details" cell's first
+     half) -- stack three lines:
+     1. **Conjunctions** -- other planets sharing this one's D1 sign, e.g.
+        `"Conj: Sa · 3.3°"`.
+     2. **Aspects** -- which planets/points THIS planet's classical
+        drishti (whole-sign aspect) falls on, e.g. `"Aspects: Su (9th),
+        Mo (7th)"`.
+     3. **Aspected by** -- which planets' drishti falls on THIS one, e.g.
+        `"Aspected by: Ma (7th)"`.
+     Dash on any line with nothing to show, never an omitted line -- see
+     point 5 below for exactly which rows are always dashed and why.
+   - **"Meaning"** (new, the old "Details" cell's second half, now its own
+     column) -- just the full `meaning` sentence, given enough width to
+     show it complete without horizontal clipping -- that was the
+     client's original complaint about the pre-compaction layout, still
+     the goal here.
+   - Keep every existing value and sentence -- this is a re-layout, not a
      content cut. Use a plain dash (`—`) only where a field is genuinely
-     unavailable for that row (e.g. the Ascendant's `conjunctions`/
-     `nature`, which the API never returns for it — see point 4 below),
-     never omit the line entirely, so every row keeps the same four-line
-     shape in the first cell.
-   - On narrow/phone-width screens, let both cells wrap their text rather
-     than truncating or forcing horizontal scroll — see the existing
-     "Mobile-responsive" guidance further down, which already applies
-     here.
+     unavailable for that row (see point 5 below for the Ascendant's
+     specific gaps), never omit the line entirely.
+   - On narrow/phone-width screens, let all three cells wrap their text
+     rather than truncating or forcing horizontal scroll -- see the
+     existing "Mobile-responsive" guidance further down, which already
+     applies here.
 2. **`/api/chart` now returns `flags` directly, on every planet AND on
    the `ascendant` entry** -- the old guidance below about falling back to
    the plain `retrograde` boolean when a tab doesn't also fetch
@@ -505,23 +557,40 @@ to match:
    `V▫` Vargottama. Put a small legend once per table (or a tooltip on
    hover) spelling out what each code means -- don't make a visitor
    memorize four symbols with no key.
-4. **Ascendant row bug, now fixed server-side:** the live page showed a
+4. **`aspects` / `aspected_by` are new fields, distinct from
+   `conjunctions`.** Conjunctions is proximity (same sign). Aspects is a
+   completely separate classical concept -- classical Parashari whole-sign
+   graha drishti: every planet aspects the 7th sign from its own (full
+   opposition, mutual for every planet including Rahu/Ketu), and Mars/
+   Jupiter/Saturn each get two additional special aspects (Mars: 4th/8th;
+   Jupiter: 5th/9th; Saturn: 3rd/10th). Both `aspects` and `aspected_by`
+   are lists of `{code, aspect}` (e.g. `{"code": "Ju", "aspect": "5th"}`)
+   -- render as `"Ju (5th)"`, comma-joined if more than one, dash if
+   empty. **This is NOT symmetric in general** -- Mars aspecting Venus at
+   the 8th doesn't mean Venus aspects Mars back (only the universal 7th
+   is always mutual) -- so `aspects` and `aspected_by` can legitimately
+   differ for the same planet; render both, don't assume one implies the
+   other.
+5. **Ascendant row -- exactly which fields are real vs. dashed, now fixed
+   server-side for the real ones:** the live page previously showed a
    Degree for the Ascendant but no Nakshatra(Pada) -- that's because
-   `/api/chart`'s `ascendant` object never had those fields at all before
-   this round. It now does (`degree_in_sign`, `nakshatra`,
-   `nakshatra_lord`, `pada`, `meaning`, `flags` -- same shape as every
-   planet entry, just without `code`/`retrograde`/`conjunctions`/`nature`,
-   since the Ascendant isn't a planet, so its "Planet / Position" cell's
-   fourth line and its "Details" cell both use a dash where those two
-   fields would be). Render its row from these fields the same way you
-   render every planet's row.
-5. **Uranus / Neptune / Pluto are intentionally still not in this table.**
+   `/api/chart`'s `ascendant` object never had those fields at all. It now
+   has `degree_in_sign`, `nakshatra`, `nakshatra_lord`, `pada`, `meaning`,
+   `flags` (only ever `["Vargottama"]` or `[]`), and `aspected_by` (real
+   -- planets aspecting the 1st house/Lagna is a standard, uncontroversial
+   idea) -- render all of these the same way as any planet's row. It has
+   **no** `code`/`retrograde`/`conjunctions`/`nature`/`aspects` -- the
+   Ascendant isn't a planet, so it never casts a conjunction or an aspect
+   of its own; use a dash for those specific lines only (Nature/Flags'
+   nature half, Conjunctions, and Aspects -- but NOT Aspected By, which is
+   real for the Ascendant).
+6. **Uranus / Neptune / Pluto are intentionally still not in this table.**
    `/api/chart` computes only the 9 classical grahas + Ascendant -- adding
    the three outer planets is real new engineering scope (new ephemeris
    calls, plus a genuine question of whether they belong in a Vedic/KP
    chart at all, since traditional practice doesn't use them) that hasn't
    been decided yet. Don't add placeholder/blank rows for them.
-6. **Which field feeds the "Sign · House" line under each chart tab** --
+7. **Which field feeds the "Sign · House" line under each chart tab** --
    same house-field rule the wheel diagrams themselves already use, now
    also driving this table: `rasi_house` for D1, `house` for Bhava Chalit,
    `navamsa_house` for D9 (from `/api/navamsa`, not `/api/chart` -- see
@@ -571,13 +640,23 @@ down for the full shape):
   `flags` is only ever `["Vargottama"]` or `[]` — it isn't a planet, so it
   has no Retrograde/Combust/dignity of its own.
 - `conjunctions` — a list of `{code, orb_degrees}` for every other planet
-  sharing this one's D1 sign (empty if none). Render at the top of the
-  "Details" cell, e.g. `"Conj: Sa · 3.3°"` for a planet listing one
-  conjunction, joined with commas if there's more than one, or a dash if
-  the list is empty — this is exactly the information a visitor needs to
-  understand why two planet codes appear stacked in the same house box.
-  Not present on the Ascendant entry (it isn't a planet, so it can't be
-  "in conjunction" with one in this sense) — use a dash there.
+  sharing this one's D1 sign (empty if none). Render on the first line of
+  the "Conj. / Aspects" cell, e.g. `"Conj: Sa · 3.3°"` for a planet
+  listing one conjunction, joined with commas if there's more than one,
+  or a dash if the list is empty — this is exactly the information a
+  visitor needs to understand why two planet codes appear stacked in the
+  same house box. Not present on the Ascendant entry (it isn't a planet,
+  so it can't be "in conjunction" with one in this sense) — use a dash
+  there.
+- `aspects` / `aspected_by` — **new**, each a list of `{code, aspect}`
+  (e.g. `{"code": "Ju", "aspect": "5th"}`) — classical Parashari whole-sign
+  graha drishti, a completely separate concept from `conjunctions` (see
+  the UPDATE box's point 4 above for the full rule). Render as the second
+  and third lines of the "Conj. / Aspects" cell: `"Aspects: Ju (5th), Mo
+  (7th)"` and `"Aspected by: Ma (7th)"`, comma-joined, dash if either list
+  is empty. The Ascendant entry has a real `aspected_by` (planets can
+  aspect the 1st house/Lagna) but no `aspects` key at all — it never
+  casts one, use a dash for that specific line only.
 - `nature` — `"Malefic"` or `"Benefic"`. Renders on the fourth line of the
   "Planet / Position" cell, alongside flags (see the UPDATE box's point 1
   above). Not present on the Ascendant entry either, for the same reason
@@ -586,19 +665,21 @@ down for the full shape):
   visually distinct" guidance below).
 
 **A single planet-details table, one row per planet** (Ascendant + 9
-planets, same order as `/api/chart`'s `planets` array), exactly two
+planets, same order as `/api/chart`'s `planets` array), exactly three
 columns — see the UPDATE box at the top of this section for the full,
 final spec: **"Planet / Position"** (Planet name; Sign · House for the
 current tab; Degree · Nakshatra(Pada); Nature · Flags, each on its own
-line) and **"Details"** (Conjunctions, then the full Meaning sentence).
-This mirrors the client's own Excel table's underlying column set (Planet,
-Position, Degree, Flags, Nature, Nak/Pada, Interpretation), compacted per
-their live-page feedback into two wide, readable cells instead of seven
-narrow ones, and should sit directly beneath each of the four chart
-wheels, using that chart type's own house-numbering convention in the
+line), **"Conj. / Aspects"** (Conjunctions; Aspects; Aspected By, each on
+its own line), and **"Meaning"** (the full sentence, alone, with room to
+breathe). This mirrors the client's own Excel table's underlying column
+set (Planet, Position, Degree, Flags, Nature, Nak/Pada, Interpretation)
+plus the classical aspect data the client asked to add on top of it,
+compacted into three wide, readable cells rather than one cramped
+grid, and should sit directly beneath each of the four chart wheels,
+using that chart type's own house-numbering convention in the
 "Sign · House" line (`rasi_house` for D1, `house` for Bhava Chalit,
 `navamsa_house` for D9, cusp number for Cuspal — same house-field rule as
-the wheel itself, see above, and see the UPDATE box's point 6).
+the wheel itself, see above, and see the UPDATE box's point 7).
 
 **Planet color scheme.** Adopt one consistent accent color per planet,
 reused everywhere that planet's code or name appears on the page (inside
@@ -726,7 +807,8 @@ Response (`ChartOut`):
     "house": 1, "longitude": 294.8, "sign": "Capricorn", "sign_lord": "Sa",
     "degree_in_sign": 24.8, "nakshatra": "Dhanishta", "nakshatra_lord": "Ma", "pada": 3,
     "meaning": "Dhanishta(3): rhythm, recognition, and a pull toward group achievement; Capricorn adds disciplined and patient.",
-    "flags": []
+    "flags": [],
+    "aspected_by": [{"code": "Ma", "aspect": "4th"}]
   },
   "houses": [ {"house": 1, "longitude": 294.8, "sign": "Capricorn", "sign_lord": "Sa"}, "... 12 total, houses 1-12" ],
   "planets": [
@@ -738,7 +820,9 @@ Response (`ChartOut`):
       "meaning": "Chitra(1): craftsmanship and a natural sense of design or charisma; Virgo adds careful and detail-driven.",
       "conjunctions": [{"code": "Me", "orb_degrees": 4.19}],
       "nature": "Benefic",
-      "flags": []
+      "flags": [],
+      "aspects": [{"code": "Ju", "aspect": "9th"}],
+      "aspected_by": [{"code": "Ma", "aspect": "7th"}]
     },
     "... 9 planets total: Su, Mo, Ma, Me, Ju, Ve, Sa, Ra, Ke — a planet in its sign of",
     "... debilitation would instead show e.g. \"flags\": [\"Debilitated\"]"
@@ -763,7 +847,10 @@ fields at all — that gap is why the live Ascendant row showed a Degree but
 no Nakshatra(Pada); see the section above for the full story). The
 Ascendant's `flags` never includes Retrograde/Combust/Exalted/
 Debilitated/Own Sign — only `"Vargottama"` or empty, since it isn't a
-planet.
+planet. **`aspects`/`aspected_by` are new (2026-09-24, later still
+again)** — classical Parashari whole-sign graha drishti, see the same
+section above for the full rule and rendering guidance; the Ascendant has
+`aspected_by` but no `aspects` key.
 
 ### `POST /api/navamsa` (BETA)
 D9 Navamsa divisional chart — standard textbook formula (movable/fixed/dual
@@ -1073,29 +1160,38 @@ something Codex needs to handle.
    Capricorn rising, Mars (which lands in Aries, house 4) must render in the
    LEFT kite box, and Mercury (Libra, house 10) in the RIGHT kite box — if
    they're swapped, the corrected mirrored polygon table wasn't applied.**
+   Also confirm the wheel diagram itself matches the latest visual-reference
+   update: a small muted house-number numeral near each box's center-ward
+   vertex, each planet's in-box label in the compact `Code(R) DD°MM'`
+   format (colored per planet), everything centered within its box, and
+   the sign abbreviation line plus the Fire/Earth/Air/Water element tint
+   still present (not dropped).
    Also confirm each wheel's Planet Details Table beneath it uses the
-   exact TWO-COLUMN layout ("Planet / Position" stacking Planet ·
-   Sign/House-for-this-tab · Degree/Nakshatra(Pada) · Nature/Flags on
-   their own lines, then "Details" with Conjunctions then the full
-   Meaning sentence — see the "Planet color scheme and the enriched
-   Planet Details Table" section above), colored consistently with the
-   wheel's own planet-code colors, across all four views, not just D1, and
-   readable without horizontal clipping (widen the Details column, or let
+   exact THREE-COLUMN layout ("Planet / Position" stacking Planet ·
+   Sign/House-for-this-tab · Degree/Nakshatra(Pada) · Nature/Flags;
+   "Conj. / Aspects" stacking Conjunctions · Aspects · Aspected By; then
+   "Meaning" alone — see the "Planet color scheme and the enriched Planet
+   Details Table" section above), colored consistently with the wheel's
+   own planet-code colors, across all four views, not just D1, and
+   readable without horizontal clipping (widen the Meaning column, or let
    it wrap on narrow screens). Specifically check: (a) the **Ascendant
-   row** shows a real Nakshatra(Pada) and Meaning, and a dash (not blank)
-   for Nature/Conjunctions, which it never has — if Nakshatra(Pada)/
-   Meaning are blank instead, the backend fix didn't make it into this
-   deploy; (b) for a chart with **Jupiter in Capricorn** (or any planet in
-   its sign of debilitation/exaltation/own sign), that planet's fourth
-   line shows the corresponding compact code (`D↓`/`E↑`/nothing extra for
-   Own Sign's badge styling) — not just Retrograde; (c) the flag legend
-   (`R*` `C^` `E↑` `D↓` `V▫`) is visible somewhere on or near the table;
-   (d) the Sign/House line actually changes when you switch tabs (D1 →
-   Bhava Chalit → D9 → Cuspal) while Degree/Nakshatra/Meaning/Conjunctions
-   stay the same for that planet, since those are natal facts, not
-   per-view ones; (e) no Uranus/Neptune/Pluto rows appear (see point 5 in
-   the update box above — that's still out of scope, not a bug to fix
-   here).
+   row** shows a real Nakshatra(Pada), Meaning, and Aspected By, with a
+   dash (not blank) for Nature/Conjunctions/Aspects, which it never has —
+   if Nakshatra(Pada)/Meaning are blank instead, the backend fix didn't
+   make it into this deploy; (b) for a chart with **Jupiter in Capricorn**
+   (or any planet in its sign of debilitation/exaltation/own sign), that
+   planet's fourth line shows the corresponding compact code (`D↓`/`E↑`/
+   nothing extra for Own Sign's badge styling) — not just Retrograde;
+   (c) the flag legend (`R*` `C^` `E↑` `D↓` `V▫`) is visible somewhere on
+   or near the table; (d) a planet's Aspects and Aspected By lists can
+   legitimately differ (e.g. Mars 8th-aspecting Venus doesn't mean Venus
+   aspects Mars back) — that's correct, not a bug to "fix" into symmetry;
+   (e) the Sign/House line actually changes when you switch tabs (D1 →
+   Bhava Chalit → D9 → Cuspal) while Degree/Nakshatra/Meaning/Conjunctions/
+   Aspects/Aspected By stay the same for that planet, since those are
+   natal facts, not per-view ones; (f) no Uranus/Neptune/Pluto rows appear
+   anywhere, in the wheel or the table (see point 6 in the update box
+   above — that's still out of scope, not a bug to fix here).
 4. Compute KP significators for the same birth details — the "beta" label
    must be visible.
 5. Try the transit view with no date (defaults to now) and with a specific

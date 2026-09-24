@@ -47,12 +47,23 @@ Details Table, fixed here:
    the Free Preview tab, a click away, already stated it correctly). The
    Ascendant also gets a `flags` list, though only ever `["Vargottama"]`
    or `[]` -- it isn't a planet, so it has no retrograde/combust/dignity
-   of its own, matching how teaser.py already treats the Ascendant row."""
+   of its own, matching how teaser.py already treats the Ascendant row.
+
+UPDATE (2026-09-24, later still again): added `aspects`/`aspected_by` to
+every planet (classical Parashari whole-sign graha drishti -- the
+universal 7th/opposition aspect for all 9 grahas plus Mars/Jupiter/
+Saturn's own special aspects, via chart_narrative.natal_aspects()) and
+`aspected_by` to the Ascendant (planets aspecting the 1st house/Lagna is
+standard; Lagna itself never casts an aspect, so it has no `aspects` key
+of its own -- consistent with how it already has no `conjunctions`/
+`nature`). Deliberately distinct from `conjunctions` (same-sign proximity)
+and from hit_calc.py's own Western-angle aspect classification used for
+CCSI stress scoring -- see chart_narrative.py's own docstring."""
 from __future__ import annotations
 
 from .chart_narrative import (
-    is_vargottama, natal_conjunctions, planet_flags, planet_nature,
-    position_meaning,
+    aspected_by_for_point, is_vargottama, natal_aspects, natal_conjunctions,
+    planet_flags, planet_nature, position_meaning,
 )
 from .ephemeris import (
     BirthMoment, NatalChart, compute_natal_chart, nakshatra_for_longitude,
@@ -78,6 +89,7 @@ def chart_to_dict(chart: NatalChart) -> dict:
     cusp_longitudes = [h.longitude for h in chart.houses]
     asc_sign_index = sign_index_for_longitude(chart.ascendant.longitude)
     conjunctions_by_code = natal_conjunctions(chart.planets)
+    aspects_by_code = natal_aspects(chart.planets)
     sun = next((p for p in chart.planets if p.code == "Su"), None)
     sun_longitude = sun.longitude if sun else None
 
@@ -89,6 +101,7 @@ def chart_to_dict(chart: NatalChart) -> dict:
         chart.ascendant.longitude
     )
     asc_flags = ["Vargottama"] if is_vargottama(chart.ascendant.longitude) else []
+    asc_aspected_by = aspected_by_for_point(chart.ascendant.longitude, chart.planets)
 
     return {
         "ayanamsa_deg": round(chart.ayanamsa_deg, 4),
@@ -104,6 +117,7 @@ def chart_to_dict(chart: NatalChart) -> dict:
             "pada": asc_pada,
             "meaning": position_meaning(chart.ascendant.sign, asc_nakshatra, asc_pada),
             "flags": asc_flags,
+            "aspected_by": asc_aspected_by,
         },
         "houses": [
             {
@@ -136,6 +150,8 @@ def chart_to_dict(chart: NatalChart) -> dict:
                 "flags": planet_flags(
                     p.code, p.sign, p.longitude, p.retrograde, sun_longitude
                 ),
+                "aspects": aspects_by_code[p.code]["aspects"],
+                "aspected_by": aspects_by_code[p.code]["aspected_by"],
             }
             for p in chart.planets
         ],

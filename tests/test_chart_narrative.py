@@ -14,8 +14,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 from app.engine.chart import chart_to_dict
 from app.engine.chart_narrative import (
     BENEFIC_PLANETS, MALEFIC_PLANETS, NAKSHATRA_THEMES, SIGN_TRAITS,
-    angular_separation, dignity_flag, is_vargottama, natal_conjunctions,
-    planet_flags, planet_nature, position_meaning,
+    angular_separation, aspected_by_for_point, dignity_flag, is_vargottama,
+    natal_aspects, natal_conjunctions, planet_flags, planet_nature,
+    position_meaning,
 )
 from app.engine.ephemeris import (
     BirthMoment, compute_natal_chart, sign_index_for_longitude,
@@ -206,3 +207,98 @@ def test_planet_flags_skips_combust_when_sun_longitude_is_missing():
     about Combust for that call."""
     flags = planet_flags("Ve", "Virgo", 155.0, False, None)
     assert "Combust" not in flags
+
+
+# --- 2026-09-24, later still again: classical Parashari graha drishti
+# (planetary aspects), added to the Planet Details Table's Details cell
+# alongside Conjunctions, per the client's own follow-up ask -----------
+
+def test_natal_aspects_matches_hand_verified_real_reference_chart():
+    """Cross-checked by hand against this engagement's own real reference
+    chart (1973-10-12, 14:55 IST, Amalsad): Sun (Virgo) and Moon (Pisces)
+    are exactly opposite signs, so they must mutually 7th-aspect each
+    other; Jupiter (Capricorn) is a genuine, hand-verified 9th-house
+    special aspect onto the Sun (Virgo) -- Capricorn + 8 signs = Virgo."""
+    chart = _real_client_reference_chart()
+    aspects = natal_aspects(chart.planets)
+
+    su_aspects = {(a["code"], a["aspect"]) for a in aspects["Su"]["aspects"]}
+    mo_aspects = {(a["code"], a["aspect"]) for a in aspects["Mo"]["aspects"]}
+    assert ("Mo", "7th") in su_aspects
+    assert ("Su", "7th") in mo_aspects  # the universal 7th is always mutual
+
+    ju_aspects = {(a["code"], a["aspect"]) for a in aspects["Ju"]["aspects"]}
+    assert ("Su", "9th") in ju_aspects
+
+
+def test_natal_aspects_universal_7th_is_always_mutual():
+    """The 7th/opposition aspect is the one relationship every graha
+    shares, and it's inherently symmetric -- if P is opposite Q, Q is
+    opposite P. Checked generically across the real chart, not just the
+    one hand-verified Sun/Moon pair above."""
+    chart = _real_client_reference_chart()
+    aspects = natal_aspects(chart.planets)
+    for code, data in aspects.items():
+        for hit in data["aspects"]:
+            if hit["aspect"] == "7th":
+                back = {(h["code"], h["aspect"]) for h in aspects[hit["code"]]["aspects"]}
+                assert (code, "7th") in back
+
+
+def test_natal_aspects_special_aspects_are_not_generally_mutual():
+    """Mars's 4th/8th (and Jupiter's/Saturn's own specials) are
+    directional -- confirmed against the real chart, where Mars (Aries)
+    8th-aspects Venus (Scorpio) but Venus does NOT aspect Mars back (their
+    distance from Venus's side isn't one of Venus's own aspect distances).
+    This isn't a bug -- it's the actual classical rule -- but worth
+    locking in as a regression test so a future refactor can't silently
+    "fix" it into false symmetry."""
+    chart = _real_client_reference_chart()
+    aspects = natal_aspects(chart.planets)
+    ma_aspects = {(a["code"], a["aspect"]) for a in aspects["Ma"]["aspects"]}
+    assert ("Ve", "8th") in ma_aspects
+    ve_aspects = {a["code"] for a in aspects["Ve"]["aspects"]}
+    assert "Ma" not in ve_aspects
+
+
+def test_natal_aspects_every_planet_has_both_keys_even_with_no_hits():
+    chart = _real_client_reference_chart()
+    aspects = natal_aspects(chart.planets)
+    for p in chart.planets:
+        assert "aspects" in aspects[p.code]
+        assert "aspected_by" in aspects[p.code]
+        assert isinstance(aspects[p.code]["aspects"], list)
+        assert isinstance(aspects[p.code]["aspected_by"], list)
+
+
+def test_natal_aspects_no_planet_ever_aspects_itself():
+    chart = _real_client_reference_chart()
+    aspects = natal_aspects(chart.planets)
+    for code, data in aspects.items():
+        assert code not in {a["code"] for a in data["aspects"]}
+        assert code not in {a["code"] for a in data["aspected_by"]}
+
+
+def test_aspected_by_for_point_finds_a_planet_aspecting_the_ascendant():
+    """A synthetic case rather than relying on the real chart happening to
+    have a hit on the Ascendant: place a fake Ascendant longitude exactly
+    opposite Jupiter's real sign and confirm the universal 7th shows up."""
+    chart = _real_client_reference_chart()
+    jupiter = next(p for p in chart.planets if p.code == "Ju")
+    opposite_longitude = (jupiter.longitude + 180.0) % 360.0
+    hits = aspected_by_for_point(opposite_longitude, chart.planets)
+    assert {"code": "Ju", "aspect": "7th"} in hits
+
+
+def test_chart_to_dict_wires_aspects_for_every_planet_and_ascendant():
+    chart = _real_client_reference_chart()
+    data = chart_to_dict(chart)
+    for p in data["planets"]:
+        assert "aspects" in p
+        assert "aspected_by" in p
+        for group in (p["aspects"], p["aspected_by"]):
+            for hit in group:
+                assert set(hit) == {"code", "aspect"}
+    asc = data["ascendant"]
+    assert "aspected_by" in asc
+    assert "aspects" not in asc  # Lagna never casts an aspect of its own

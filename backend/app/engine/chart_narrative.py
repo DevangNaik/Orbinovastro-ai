@@ -221,6 +221,89 @@ def planet_flags(
     return flags
 
 
+# Classical Parashari graha drishti (planetary aspect), whole-sign/house
+# based -- counted forward from the ASPECTING planet's own D1 sign to the
+# target sign: distance 1 is the same sign (conjunction, never itself an
+# aspect), distance 7 is the opposite sign ("full aspect"/opposition,
+# universal to every graha including Rahu/Ketu -- the one near-universally
+# agreed convention for the nodes' aspect, unlike their dignity, which is
+# why dignity_flag() above deliberately excludes them but this doesn't).
+# Mars, Jupiter, and Saturn additionally get two special aspects each.
+# Standard, textbook classical rule -- NOT the client's own Kundli
+# worksheet's aspect logic (unconfirmed), and NOT the same thing as
+# hit_calc.py's own aspect classification (Cnj/Frn/BFrn/SoulM/Irritation/
+# Enemy/Killer), which uses continuous Western angles for a completely
+# different purpose (CCSI stress scoring) -- the two must never be
+# conflated, even though both use the word "aspect."
+_UNIVERSAL_ASPECT_DISTANCE = 7
+_SPECIAL_ASPECT_DISTANCES: dict[str, set[int]] = {
+    "Ma": {4, 8},
+    "Ju": {5, 9},
+    "Sa": {3, 10},
+}
+
+_ASPECT_ORDINALS: dict[int, str] = {
+    1: "1st", 2: "2nd", 3: "3rd", 4: "4th", 5: "5th", 6: "6th", 7: "7th",
+    8: "8th", 9: "9th", 10: "10th", 11: "11th", 12: "12th",
+}
+
+
+def _aspect_distances_for(code: str) -> set[int]:
+    return {_UNIVERSAL_ASPECT_DISTANCE} | _SPECIAL_ASPECT_DISTANCES.get(code, set())
+
+
+def _house_distance(from_sign_index: int, to_sign_index: int) -> int:
+    """1-12, counted forward from the aspecting point's own sign; 1 means
+    the same sign (never itself an aspect -- that's a conjunction)."""
+    return ((to_sign_index - from_sign_index) % 12) + 1
+
+
+def natal_aspects(planets: list) -> dict:
+    """Classical whole-sign graha drishti among the 9 real grahas (any
+    object/dict-like with `.code`/`.longitude`, matching ephemeris.py's
+    PlanetInfo). Returns {code: {"aspects": [...], "aspected_by": [...]}}
+    for every planet, each list holding zero or more {"code", "aspect"}
+    entries (e.g. {"code": "Ju", "aspect": "5th"}), never a missing key.
+    NOT symmetric in general: Mars's 4th/8th (and Jupiter's/Saturn's own
+    specials) are one-directional -- Mars aspecting a planet 4 signs away
+    does not mean that planet aspects Mars back, since the 4th/8th/5th/9th/
+    3rd/10th relationship isn't its own mirror the way opposition (7th) is.
+    Only the universal 7th aspect is always mutual. For a non-graha point
+    like the Ascendant, see `aspected_by_for_point` below -- it can be
+    aspected but never casts one of its own."""
+    sign_index = {p.code: sign_index_for_longitude(p.longitude) for p in planets}
+    result: dict[str, dict[str, list]] = {
+        p.code: {"aspects": [], "aspected_by": []} for p in planets
+    }
+    for p in planets:
+        p_distances = _aspect_distances_for(p.code)
+        for q in planets:
+            if q.code == p.code:
+                continue
+            dist = _house_distance(sign_index[p.code], sign_index[q.code])
+            if dist in p_distances:
+                label = _ASPECT_ORDINALS[dist]
+                result[p.code]["aspects"].append({"code": q.code, "aspect": label})
+                result[q.code]["aspected_by"].append({"code": p.code, "aspect": label})
+    return result
+
+
+def aspected_by_for_point(point_longitude: float, planets: list) -> list:
+    """Which planets' drishti lands on a non-graha chart point -- the
+    Ascendant/Lagna being the practical case (planets aspecting the 1st
+    house is a completely standard, uncontroversial idea, even though
+    Lagna itself never casts an aspect back, since it isn't a graha).
+    Returns a list of {"code", "aspect"} entries, empty if none."""
+    target_index = sign_index_for_longitude(point_longitude)
+    hits: list[dict] = []
+    for p in planets:
+        p_index = sign_index_for_longitude(p.longitude)
+        dist = _house_distance(p_index, target_index)
+        if dist in _aspect_distances_for(p.code):
+            hits.append({"code": p.code, "aspect": _ASPECT_ORDINALS[dist]})
+    return hits
+
+
 def natal_conjunctions(planets: list) -> dict:
     """For each planet (any object/dict-like with .code/.sign/.longitude
     attributes), lists every OTHER planet sharing its same D1 (Rasi) sign
