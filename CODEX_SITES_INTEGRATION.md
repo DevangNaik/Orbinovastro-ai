@@ -815,22 +815,40 @@ match:
 1. **Exactly three columns per planet row.** No separate Sign/House,
    Degree, Nakshatra(Pada), Flags, or Nature columns -- those still fold
    into the first cell as before:
-   - **"Planet / Position"** -- stack these four lines vertically in one
-     cell (unchanged from the previous round):
-     1. Planet symbol and name (e.g. `Ma Mars`)
-     2. Sign and house **for the currently selected chart view** (e.g.
-        `Aries · House 4`) -- this is the one line that changes between
-        the D1/Bhava Chalit/D9/Cuspal tabs (see point 7 below for exactly
-        which field feeds which tab); every other line in this cell is a
-        natal fact and stays identical across all four tabs for the same
-        planet.
-     3. Degree and nakshatra(pada) (e.g. `12.32° · Ashwini(4)`)
-     4. Nature and flags together (e.g. `Malefic · Retrograde`, or
-        `Malefic · Debilitated · Retrograde` when more than one flag
-        applies) -- use the compact flag codes from point 3 below, with a
-        legend, styled as small colored badges/pills consistent with the
-        Nature badges (see the "Planet color scheme" guidance below), not
-        plain text.
+   - **"Planet / Position"** -- ~~stack these four lines vertically in one
+     cell~~ **SUPERSEDED (2026-09-24, newest -- client asked to compact
+     this cell): exactly THREE tightly-spaced lines, not four** --
+     merge the planet name onto the same line as sign/house:
+     1. `{code} {full name} · {sign} · House {N}` -- e.g. `Ma Mars ·
+        Aries · House 4`. The sign/house part is **for the currently
+        selected chart view** (see point 7 below for exactly which field
+        feeds which tab) -- it's the one part of this line that changes
+        between the D1/Bhava Chalit/D9/Cuspal tabs; the planet name part
+        never changes.
+     2. `{DegreeInSign}° · {Nakshatra}({Pada})` -- e.g. `12.23° ·
+        Ashwini(4)`. **Nakshatra(Pada) appears ONLY on this line** --
+        don't repeat it anywhere else in this cell (the Meaning column's
+        own sentence, in the separate "Meaning" cell, still leads with
+        it as before -- that's a different column and stays unchanged).
+     3. Nature and flags together, e.g. `Malefic · R* · Own Sign` --
+        same compact flag codes and dash conventions as already
+        specified (point 3 below and point 5's Ascendant-specific
+        gaps), styled as small colored badges/pills, not plain text.
+     Applies to the Ascendant row too, with its own existing dash
+     conventions for Nature (it has none) unchanged.
+     **Spacing (2026-09-24, newest):** reduce this cell's vertical
+     padding from roughly 18px to ~10-12px, use a line-height of about
+     1.35-1.45, and reduce the margin between these three lines (and
+     between whichever populated lines remain in the "Conj. / Aspects"
+     cell, per the omit-when-empty rule above) to 3-4px. Do **not** set
+     a fixed row height or truncate/abbreviate the Meaning sentence --
+     let it wrap normally, and let each row be only as tall as its
+     tallest cell actually needs. Keep the existing three-column layout,
+     colors, badges, dividers, and mobile behavior (cells still stack on
+     a phone) -- this is a spacing/line-count change only, not a
+     redesign. Verify Mars's three lines stay readable and that rows
+     with short Meaning sentences no longer carry extra empty vertical
+     space.
    - **"Conj. / Aspects"** (new, replacing the old "Details" cell's first
      half) -- stack three lines:
      1. **Conjunctions** -- other planets sharing this one's D1 sign, e.g.
