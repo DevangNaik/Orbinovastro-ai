@@ -19,17 +19,25 @@ Endpoints:
   POST /api/overview-report -> STAGE 1 (2026-09-24) of the paid Overview
                               Report PDF: the core 5-part Life Balance Index
                               report, computed live from /api/ccsi's own
-                              engine + an OpenAI interpretation pass. Does
-                              NOT yet include the Kundli chart/Troubles &
-                              Misfortune/South Indian chart pages (Stage 2,
-                              not started), and its house/planet life-area
-                              wording is still standard placeholder text,
-                              not the client's own sheet wording -- see
-                              engine/overview_report_builder.py.
-  POST /api/teaser        -> free client-facing preview (ascendant/Moon sign
-                              + blurb + booking link) -- NOT gated behind a
-                              subscription; its whole purpose is to attract
-                              visitors who haven't paid yet
+                              engine + an OpenAI interpretation pass, using
+                              the client's own real house/planet life-area
+                              wording (see engine/overview_report/
+                              overview_labels.py). Does NOT yet include the
+                              Kundli chart/Troubles & Misfortune/South
+                              Indian chart pages (Stage 2, not started).
+  POST /api/teaser        -> free, ungated "Free Preview": a full D1 chart
+                              placement analysis (Ascendant + all 9 planets,
+                              each with its own house, the client's own real
+                              signification/house-domain wording, and an
+                              analytical narrative), plus an executive
+                              summary, a structural synthesis, and an
+                              explicit upgrade pitch describing what the
+                              paid Diagnostic Report adds -- deliberately
+                              template text, no LLM call (see engine/
+                              teaser.py's module docstring for why); its
+                              whole purpose is to attract visitors who
+                              haven't paid yet, so it is NOT gated behind a
+                              subscription even once auth is turned on
   POST /api/chat          -> chat with the OpenAI assistant (non-streaming)
   POST /api/chat/stream   -> same, but Server-Sent Events token streaming
   GET  /                  -> serves the frontend (frontend/index.html)
@@ -78,7 +86,7 @@ from .models import (
     BirthDetailsIn, CcsiOut, CcsiRequestIn, CcsiRowOut,
     ChartOut, ChatRequestIn, ChatResponseOut,
     GeocodeOut, GeocodeRequestIn, KPBetaOut,
-    NavamsaOut, NavamsaPlanetOut, OverviewReportRequestIn, TeaserOut,
+    NavamsaOut, NavamsaPlanetOut, OverviewReportRequestIn, TeaserOut, TeaserPlacementOut,
     TransitOut, TransitPlanetOut, TransitRequestIn,
 )
 
@@ -208,11 +216,9 @@ def api_navamsa(body: BirthDetailsIn, _user=Depends(require_active_subscription)
 
 @app.post("/api/teaser", response_model=TeaserOut)
 def api_teaser(body: BirthDetailsIn) -> TeaserOut:
-    """Free client-facing preview: ascendant + Moon sign (validated
-    mechanical layer) paired with a short general-personality blurb and a
-    link to book the full paid consultation. Deliberately NOT gated
-    behind require_active_subscription -- see module docstring above and
-    engine/teaser.py."""
+    """Free, ungated "Free Preview": a full D1 chart placement analysis.
+    Deliberately NOT gated behind require_active_subscription -- see
+    module docstring above and engine/teaser.py."""
     try:
         chart = build_chart_from_fields(
             year=body.year, month=body.month, day=body.day,
@@ -228,7 +234,11 @@ def api_teaser(body: BirthDetailsIn) -> TeaserOut:
         raise HTTPException(status_code=400, detail=f"Could not compute preview: {exc}") from exc
     return TeaserOut(
         ascendant_sign=teaser.ascendant_sign, moon_sign=teaser.moon_sign,
-        headline=teaser.headline, blurb=teaser.blurb, book_url=teaser.book_url,
+        sun_sign=teaser.sun_sign, headline=teaser.headline, blurb=teaser.blurb,
+        executive_summary=teaser.executive_summary,
+        placements=[TeaserPlacementOut(**vars(p)) for p in teaser.placements],
+        synthesis=teaser.synthesis, upgrade_pitch=teaser.upgrade_pitch,
+        book_url=teaser.book_url,
     )
 
 

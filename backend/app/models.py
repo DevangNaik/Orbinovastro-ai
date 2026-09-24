@@ -85,17 +85,52 @@ class NavamsaOut(BaseModel):
     beta_disclaimer: str
 
 
+class TeaserPlacementOut(BaseModel):
+    code: str = Field(description="Asc, or one of the 9 planet codes (Su/Mo/Ma/Me/Ju/Ve/Sa/Ra/Ke)")
+    name: str
+    sign: str
+    house: int = Field(description="Classical D1/Rasi whole-sign house (1-12), from the ascendant's own sign")
+    retrograde: bool
+    governs: str = Field(description="Short signification label, from the client's own real HIT_CALC wording")
+    house_domain: str = Field(description="Short house life-area label, from the client's own real HIT_CALC wording")
+    narrative: str = Field(description="Full analytical sentence(s) for this specific placement")
+
+
 class TeaserOut(BaseModel):
     ascendant_sign: str
     moon_sign: str
+    sun_sign: str = ""
     headline: str
     blurb: str
+    executive_summary: str = Field(
+        "", description="Ascendant/Sun/Moon ('Big Three') synthesis paragraph"
+    )
+    placements: list[TeaserPlacementOut] = Field(
+        default_factory=list,
+        description="Ascendant + all 9 planets, each with its D1 house, real "
+        "signification/house-domain labels, and a full analytical narrative",
+    )
+    synthesis: str = Field(
+        "", description="Chart-wide structural synthesis (kendra/trikona counts, "
+        "houses occupied) -- descriptive only, never a favorability judgment"
+    )
+    upgrade_pitch: str = Field(
+        "", description="Explicit, honest statement of what this free preview "
+        "does NOT include (stress/support scoring, dasha activation) and that "
+        "the paid Diagnostic Report supplies it"
+    )
     book_url: str
     disclaimer: str = (
-        "A free preview only -- ascendant and Moon sign from the "
-        "validated mechanical layer, paired with general sign-level "
-        "description. Not a personalized reading; book a consultation "
-        "for that."
+        "A free preview only -- the D1 (Rasi) chart's placement structure: "
+        "which sign and house every planet occupies, and which of this "
+        "practice's own real house/planet domains that activates. All "
+        "positions are Nirayana (sidereal), from the validated mechanical "
+        "layer. Deliberately does NOT include KP significators (see the "
+        "beta significators feature), dasha/bhukti timing, or the "
+        "proprietary connection-and-stress scoring (CCSI) that the full "
+        "paid Diagnostic Report is built on -- this preview describes "
+        "WHERE each planet sits, not whether that placement is currently "
+        "under astrological support or stress."
     )
 
 

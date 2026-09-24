@@ -44,11 +44,30 @@ astrology math itself.
 > No backend changes needed on your side — just a new button/flow that calls
 > `POST /api/overview-report` and downloads the PDF it returns. See the new
 > rule 7 below, the new "Overview Report" item under "What to build", and the
-> new `/api/overview-report` section in the API contract. **One thing to flag
-> to the client, not something for you to change:** the report's house/planet
-> label wording is currently a standard-textbook placeholder, not the
-> client's own final text — this doesn't affect anything you build, it's a
-> backend content update coming later.
+> new `/api/overview-report` section in the API contract. The report's
+> house/planet label wording now uses the client's own real, final text
+> (an earlier version of this document flagged this as a placeholder --
+> that has since been replaced; nothing for you to do about it either way,
+> it's backend content, not something Codex renders directly).
+
+> **Update (2026-09-24, later still): the Preview is now a full D1 chart
+> analysis, not a one-paragraph blurb -- this is the free feature's whole
+> reason for existing, so give it real layout attention.** The client's own
+> feedback on the live Preview was direct: it "doesn't make the user order
+> more... and doesn't even give trust." `/api/teaser`'s response shape has
+> grown substantially as a result -- it still returns the original
+> `headline`/`blurb`/`ascendant_sign`/`moon_sign`/`book_url` fields (nothing
+> you already built breaks), but now ALSO returns `sun_sign`,
+> `executive_summary` (an Ascendant/Sun/Moon "Big Three" synthesis
+> paragraph), `placements` (an array of 10 objects -- the Ascendant plus all
+> 9 planets -- each with its own D1 house, sign, and a full analytical
+> narrative sentence written in the practice's own real house/planet
+> language), `synthesis` (a chart-wide structural paragraph), and
+> `upgrade_pitch` (an explicit, honest paragraph naming exactly what the
+> paid Diagnostic Report adds beyond this free preview). See the rewritten
+> `/api/teaser` section below for the full new contract and layout
+> guidance -- this is a genuinely bigger view now, not a small tweak, and
+> it should be laid out accordingly (see "Visual design pass" below too).
 
 ## Why this shape (read this before building)
 
@@ -113,14 +132,37 @@ and Preview / Chart / Transit / KP Significators / Chat tabs):
    UTC offset, latitude/longitude, and a place-name field with a "Look up"
    button that calls `/api/geocode` to fill in lat/long/UTC offset
    automatically. (Already live — keep as-is.)
-2. A **Preview** view (new — the client-facing "candy"): calls `/api/teaser`
-   with just the birth details (no sign-in required), shows the `headline`
-   and `blurb` text, and a prominent **"Book Your Full Reading"** button
-   linking to the response's `book_url`. This should be the most inviting,
-   least cluttered view on the page — ideally the first tab a new visitor
-   lands on — since its whole job is to turn a curious visitor into a
-   booking. Show the `disclaimer` in small print, but don't let it compete
-   visually with the headline/blurb/button.
+2. A **Preview** view (the client-facing "Free Preview" -- now a full D1
+   analysis, not a short blurb): calls `/api/teaser` with just the birth
+   details (no sign-in required) and renders, top to bottom:
+   - The `headline`, as a large opening line.
+   - `executive_summary` -- a full paragraph (Ascendant/Sun/Moon "Big
+     Three" synthesis). Render as body text, not cramped into a card.
+   - A **Planetary Placements** section built from the `placements` array
+     (10 entries: Ascendant + all 9 planets). Each entry has `code`,
+     `name`, `sign`, `house`, `retrograde`, `governs`, `house_domain`, and
+     `narrative` (a full sentence or two of analysis for that placement).
+     Render this as a clean, scannable list or table -- one row/card per
+     placement, e.g. a compact header line ("Jupiter -- Capricorn -- House
+     1") followed by the `narrative` text -- not as ten disconnected walls
+     of text. A small "R" badge on `retrograde: true` rows is a nice touch
+     (standard astrology convention).
+   - `synthesis` -- a closing structural paragraph (kendra/trikona house
+     counts). Render as body text.
+   - `upgrade_pitch` -- the paragraph that explains exactly what the paid
+     Diagnostic Report adds beyond this preview. Give this its own
+     visually distinct block (not identical styling to the narrative
+     paragraphs above it) immediately before the CTA, since it's doing the
+     actual conversion work.
+   - A prominent **"Book Your Full Reading"** button linking to the
+     response's `book_url`, placed after `upgrade_pitch`.
+   - `disclaimer` in small print at the very bottom -- don't let it
+     compete visually with the content above it.
+   This is a substantially longer view than before (roughly 10 planet-level
+   paragraphs plus 3 summary paragraphs) -- it should still be the most
+   inviting tab on the page, but "inviting" now means well-organized and
+   easy to scan, not short. See "Visual design pass" below for the
+   specific layout bar to hit.
 3. An **Overview Report** feature (new — the client's actual paid product):
    a **"Get My Full Report"** button (placed prominently, e.g. as the natural
    next step after the Preview, or its own tab) that collects the same birth
@@ -253,12 +295,20 @@ This page is what a prospective client sees right before deciding whether to
 book a paid reading, so it needs to look considered and trustworthy, not like
 a debug dashboard. Concretely:
 
-- **The Preview tab is the hero.** It's the entry point for new visitors and
-  the one place with a single, clear conversion goal — give it the most
-  generous whitespace, the largest type, and the most visual polish of any
-  view. The "Book Your Full Reading" button should look like the obvious next
-  action (real button styling, not a plain link), not compete with anything
-  else on the page.
+- **The Preview tab is the hero, and it is now a genuinely long-form page --
+  design it like a short professional report, not a horoscope card.** Use
+  real section structure (a short intro/executive-summary block, then a
+  clearly delineated Planetary Placements section, then a closing
+  synthesis + upgrade block), generous whitespace between sections, and a
+  readable measure (don't let paragraphs run edge-to-edge on a wide
+  screen). The "Book Your Full Reading" button should look like the
+  obvious next action (real button styling, not a plain link) and should
+  sit directly below the `upgrade_pitch` paragraph, not buried further
+  down the page.
+- **The `upgrade_pitch` block is the conversion moment -- give it a
+  distinct visual treatment** (e.g. a subtly shaded panel or a border
+  accent) so it reads as "here's what you get next," not as one more
+  paragraph of chart description blending into the ones above it.
 - **Consistent chart-wheel styling across D1 / Bhava Chalit / D9 / Cuspal.**
   Same wheel size and stroke weight in all four; a small accent-color tag or
   icon per chart type so a user can tell at a glance which one they're
@@ -371,26 +421,65 @@ Response (`NavamsaOut`):
 charts — that's not how D-charts work).
 
 ### `POST /api/teaser`
-The free, client-facing "candy" preview — deliberately not gated behind
-sign-in, even once auth is turned on elsewhere. No predictions, no
-significators — just ascendant + Moon sign framing and a booking link.
+The free, client-facing "Free Preview" -- deliberately not gated behind
+sign-in, even once auth is turned on elsewhere. A full D1 (Rasi) chart
+PLACEMENT analysis -- which sign and house every planet occupies, and what
+that means in the practice's own real house/planet language -- but
+deliberately stops short of the paid report's proprietary stress/support
+scoring (`upgrade_pitch` says so explicitly; see `engine/teaser.py`'s
+module docstring on the backend for the full reasoning, if you want it).
 
 Request: same `BirthDetailsIn` shape as `/api/chart` (only `name` and the
 birth/location fields are used; `place` is ignored here).
 
-Response (`TeaserOut`):
+Response (`TeaserOut`) -- note this grew substantially from the original
+headline/blurb-only shape; every field below is present on every response:
 ```json
 {
-  "ascendant_sign": "Capricorn", "moon_sign": "Pisces",
-  "headline": "Devang rises in Capricorn, Moon in Pisces.",
+  "ascendant_sign": "Capricorn",
+  "moon_sign": "Pisces",
+  "sun_sign": "Virgo",
+  "headline": "Devang Naik rises in Capricorn, Moon in Pisces.",
   "blurb": "A Capricorn ascendant carries quiet discipline -- composed, ambitious, patient in the way it builds. Paired with a Moon that dissolves easily into feeling -- an emotional world that is porous, dreamy, compassionate.",
+  "executive_summary": "Devang Naik's Ascendant (Lagna) -- the structural frame through which every other placement in this chart is expressed, and the significator of Self/Personality -- falls in Capricorn. A Capricorn ascendant carries quiet discipline -- composed, ambitious, patient in the way it builds. The Sun, seat of core identity and executive will, is placed in Virgo: A Sun in Virgo anchors identity in competence -- methodical, detail-oriented, defined by the standard of its own work. The Moon, governing cognitive and emotional processing, is placed in Pisces: Paired with a Moon that dissolves easily into feeling -- an emotional world that is porous, dreamy, compassionate. Ascendant, Sun, and Moon together form the chart's baseline operating profile -- the reference frame against which the full nine-planet, twelve-house structure below is read.",
+  "placements": [
+    {
+      "code": "Asc", "name": "Ascendant", "sign": "Capricorn", "house": 1,
+      "retrograde": false, "governs": "Self/Body", "house_domain": "Self/Personality",
+      "narrative": "The Ascendant -- karaka (significator) for Self/Body (core identity, physical vitality, and the outward expression of will) -- rises in Capricorn, defining the first house: Self/Personality (physical body, appearance, temperament, vitality, and overall approach to life). Every other placement in this chart is read relative to this one, making it the fixed reference point of the entire structure."
+    },
+    {
+      "code": "Su", "name": "Sun", "sign": "Virgo", "house": 9,
+      "retrograde": false, "governs": "Soul/Vitality", "house_domain": "Fortune/Dharma",
+      "narrative": "Sun -- karaka (significator) for Soul/Vitality (inner life force, emotional security, and instinctive nurturing needs) -- is positioned in Virgo, within the ninth house: Fortune/Dharma (father, teachers, higher learning, spirituality, luck, and long-distance or foreign journeys). In structural terms, Sun channels its core signification into the domain of fortune/dharma, making this house one of the principal channels through which soul/vitality is expressed in this chart."
+    }
+    // ... 8 more entries: Mo, Ma, Me, Ju, Ve, Sa, Ra, Ke, in that order,
+    // same shape as above. 10 entries total (Ascendant + 9 planets).
+  ],
+  "synthesis": "Viewed as a whole, this chart distributes its nine planetary placements across 8 of the twelve houses. 3 of 9 placements fall in the angular (kendra) houses -- the first, fourth, seventh, and tenth, the classical structural axis of self, home, partnership, and career -- and 2 of 9 fall in the trinal (trikona) houses -- the first, fifth, and ninth, associated with fortune, creativity, and higher purpose. These are structural counts, not a verdict of favorability: this preview describes WHERE each planet sits, not whether that placement is presently operating under supportive or adverse astrological pressure.",
+  "upgrade_pitch": "This is precisely where the free preview stops, by design. Placement -- which sign, which house, which of your twelve life domains each planet activates -- is descriptive fact, and it is shown above in full, across all nine planets and the Ascendant. What it does not yet tell you is how those placements interact: which houses are presently reinforced and which are under measurable stress, both in this natal chart and under today's transiting sky, and how your current planetary period (dasha) is activating specific placements right now. That quantified, house-by-house diagnostic -- built on this practice's own proprietary connection-and-stress scoring methodology -- is the core of the full Diagnostic Report, delivered as a complete written assessment, not a set of raw numbers.",
   "book_url": "https://orbinovastro.square.site/s/appointments",
-  "disclaimer": "General sign-level preview, not a personalized reading -- book a full consultation for chart-specific guidance."
+  "disclaimer": "A free preview only -- the D1 (Rasi) chart's placement structure: which sign and house every planet occupies, and which of this practice's own real house/planet domains that activates. All positions are Nirayana (sidereal), from the validated mechanical layer. Deliberately does NOT include KP significators (see the beta significators feature), dasha/bhukti timing, or the proprietary connection-and-stress scoring (CCSI) that the full paid Diagnostic Report is built on -- this preview describes WHERE each planet sits, not whether that placement is currently under astrological support or stress."
 }
 ```
-Render `headline` and `blurb` as the main content, with a prominent button
-labeled something like **"Book Your Full Reading"** that links to `book_url`
-(opens in a new tab). Show `disclaimer` in small print near the bottom.
+
+Rendering guidance (see "What to build" item 2 and "Visual design pass" above
+for the full layout spec):
+- `headline` — large opening line.
+- `executive_summary` — a full paragraph, body text.
+- `placements` — a scannable list/table, one row or card per entry, showing
+  at minimum `name` + `sign` + `house` as a header and `narrative` as the
+  body; a small badge on `retrograde: true` entries is a nice touch.
+- `synthesis` — a closing paragraph, body text.
+- `upgrade_pitch` — its own visually distinct block (this is the conversion
+  moment — see "Visual design pass" above), directly followed by the
+  **"Book Your Full Reading"** button linking to `book_url` (opens in a new
+  tab).
+- `disclaimer` — small print at the very bottom.
+- `ascendant_sign`/`moon_sign`/`sun_sign`/`blurb` are still returned for
+  convenience (e.g. if you want a short one-line sign summary somewhere in
+  the header) but are fully subsumed by `executive_summary` — you don't need
+  to render `blurb` separately if `executive_summary` is already shown.
 
 ### `POST /api/kp-beta`
 Request: same `BirthDetailsIn` shape as `/api/chart`.
@@ -546,8 +635,14 @@ something Codex needs to handle.
 
 1. `GET {BASE_URL}/health` returns `{"status": "ok"}`.
 2. Fill in a known birth detail (or use "Look up" with a place name) and
-   generate the **Preview** — confirm the headline/blurb read sensibly and
-   the "Book Your Full Reading" button opens `book_url` in a new tab.
+   generate the **Preview** — confirm the headline and executive summary
+   read sensibly, all 10 placement entries (Ascendant + 9 planets) render
+   with their own narrative text, the closing synthesis and upgrade-pitch
+   paragraphs both appear with the upgrade pitch visually distinct, and the
+   "Book Your Full Reading" button opens `book_url` in a new tab. Cross-check
+   one or two placements' `house`/`sign` values against the Chart tab's own
+   output for the same birth details -- they must agree exactly (both read
+   from the same underlying chart).
 3. Compute the chart and check all **four reference views**, each with an
    actual chart-wheel diagram (not just a table): D1 shows each planet's
    `rasi_house` and its wheel boxes use whole-sign houses from the
