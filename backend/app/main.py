@@ -432,7 +432,12 @@ def api_overview_report(body: OverviewReportRequestIn, _user=Depends(require_act
     now reads "false" for a normal request. Also as of the same date, the
     Transit Information block shows the transit's actual location (never
     blank) plus BOTH its local time and UTC time, explicitly labeled --
-    see `_resolve_transit_display_info()` above.
+    see `_resolve_transit_display_info()` above. Also as of the same date
+    (client-reported: the PDF didn't say whether the shown transit was
+    "right now" or a custom date/time the visitor picked in the Transit
+    tab), the Transit Information table's first row is a "Transit Basis"
+    line spelling that out in plain language -- see `transit_source`
+    ("now"/"custom") threaded into `build_overview_report_pdf()` below.
 
     Returns the finished PDF as the raw response body (not JSON) --
     Content-Disposition names it "<client name>_overview.pdf"."""
@@ -442,7 +447,7 @@ def api_overview_report(body: OverviewReportRequestIn, _user=Depends(require_act
     from .engine.overview_report_builder import build_overview_report_pdf, safe_filename
 
     try:
-        natal_moment, transit_moment, _source = _resolve_natal_and_transit_moments(body.birth, body.transit)
+        natal_moment, transit_moment, transit_source = _resolve_natal_and_transit_moments(body.birth, body.transit)
         transit_place, transit_display_offset = _resolve_transit_display_info(
             body.birth, body.transit, transit_moment,
         )
@@ -452,6 +457,7 @@ def api_overview_report(body: OverviewReportRequestIn, _user=Depends(require_act
             birth_place=body.birth.place,
             transit_place=transit_place,
             transit_display_offset_hours=transit_display_offset,
+            transit_source=transit_source,
         )
     except HTTPException:
         raise

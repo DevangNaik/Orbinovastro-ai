@@ -5,6 +5,55 @@ build. It describes an existing, already-built, already-tested backend — Codex
 job is to build a **frontend page that calls it**, not to reimplement any of the
 astrology math itself.
 
+> **Update (2026-09-24, latest again): the chart wheel was flipped left-right, and every reference chart view needs a richer per-planet table matching the client's own Excel Kundli chart.** The client sent their own Horosoft screenshot and Excel Kundli chart as "the standard practice" reference and pointed out two things:
+> 1. **The North Indian chart wheel geometry was mirrored.** House 4 (and everything on "that side") was drawn on the right when it belongs on the left, and vice versa — confirmed against the client's own real chart. **The corrected polygon table is in the "Chart wheel diagram" section below — if Codex already built the wheel, replace the old table with the corrected one exactly, don't just eyeball a fix.** This applies to all four wheels (D1, Bhava Chalit, D9, Cuspal) at once, since they share one shared geometry table.
+> 2. **Add Degree, Nakshatra(Pada), Conjunction degrees, and a "meaning of position" sentence to the chart views, plus a distinct color per planet and an element-tinted house box** — matching the level of detail and visual polish in the client's own Excel chart, "adopted for client presentation" (the client's own words) rather than copied verbatim (their Excel is a working tool, not client-facing design). `/api/chart`'s `planets` array gained three new fields for this (`meaning`, `conjunctions`, `nature`) — see the new "Planet color scheme and the enriched Planet Details Table" section below for the full spec, table layout, and column mapping. **Apply this to all four reference chart views, not only D1** — the client explicitly asked for this.
+>
+> No other endpoint's request/response shape changed in this update.
+
+> **Update (2026-09-24, latest): each Preview placement now carries a new
+> `flags` array -- Retrograde / Combust / Exalted / Debilitated / Own Sign /
+> Vargottama -- and the client also caught (and this fixes) a real bug
+> where Rahu was never shown as retrograde even though it always should be.
+> No new endpoint -- same `/api/teaser` response shape you already render,
+> with one addition:**
+> - Every entry in `placements` (Ascendant + all 9 planets) now has a
+>   `flags: string[]` field: zero or more of `"Retrograde"`, `"Combust"`,
+>   `"Exalted"`, `"Debilitated"`, `"Own Sign"`, `"Vargottama"`. It can be an
+>   empty array -- most placements won't have any of these. See the updated
+>   example under `/api/teaser` below (Mars: `["Retrograde", "Own Sign"]`).
+> - **These flags are already woven into the `narrative` prose for that
+>   placement** (e.g. "This also happens to be one of Mars's own signs..."),
+>   so nothing breaks if you only ever render `narrative` and ignore
+>   `flags` entirely. The `flags` array exists so you can additionally show
+>   a small badge/chip next to the placement label, consistent with the
+>   existing "Retrograde and beta markers should be visually distinct"
+>   guidance in the Visual design pass section below -- e.g. next to
+>   "**Mars retrograde in Aries · House 3**", add small chips reading
+>   "Own Sign" for each other flag present. Not required if it adds real
+>   complexity; the narrative text alone already communicates it.
+> - **Bug fix, no frontend change needed:** Rahu will now correctly show
+>   `"retrograde": true` (and `"Retrograde"` in `flags`) like Ketu always
+>   has -- previously a backend bug always reported Rahu as non-retrograde
+>   regardless of its actual computed position. If your Chart/Transit/KP
+>   tabs render `retrograde`, they'll pick this fix up automatically, no
+>   code change required there either.
+> - These flags use standard classical Vedic rules (documented in the
+>   `disclaimer` field, updated -- see below), not yet the client's own
+>   exact proprietary Kundli-worksheet formulas for these same markers
+>   (that logic lives in unported Excel and is a separate, larger future
+>   task). Vargottama additionally inherits the existing D9/Navamsa "beta"
+>   caveat. No wording change needed on your end beyond rendering the
+>   updated `disclaimer` text as you already do.
+> - Also as of the same date: the **paid Overview Report PDF** (downloaded
+>   via the `/api/overview-report` button, see item 3 below) now includes a
+>   "Transit Basis" row at the top of its Transit Information table,
+>   spelling out in plain language whether the shown transit is the current
+>   moment or a custom date/time, and which location "Local" refers to.
+>   This is entirely inside the generated PDF -- **no frontend change needed
+>   for this one**, since your page doesn't render that table itself, it
+>   just triggers the download.
+
 > **Update (2026-09-27): the Preview's house numbers now use a different
 > convention than before -- cuspal (Bhava Chalit / Nirayana bhava), not
 > whole-sign -- and this must be visibly indicated to the visitor.** No new
@@ -323,12 +372,17 @@ the API doesn't care how it looks, only that the data displayed came from it.
 
 ## Chart wheel diagram (exact algorithm — reproduce, don't redesign)
 
+**CORRECTED 2026-09-24 (latest) — the polygon table below was mirrored left-right; if Codex already built the wheel from the old table, replace it with this corrected one.** The client sent a real Horosoft screenshot and their own Excel Kundli chart as the standard-practice reference and pointed out the live wheel was flipped — concretely, house 4 (and everything on "that side") was drawn on the right when it belongs on the left (and vice versa for the other side). Root cause, confirmed by re-deriving the geometry from the client's own reference: the original table numbered the 12 boxes going **clockwise** from the top box (1→2 upper-right→3→4 right kite→...→10 left kite→...), but the correct, standard North Indian convention numbers them going **counter-clockwise** from the top (1→2 upper-**left**→3→4 **left** kite→...→10 **right** kite→...). This was independently confirmed against the client's own real Excel chart: house 4 (Aries, containing Mars for the reference birth chart) sits in the **left** kite there, and house 10 (Libra, containing Mercury) sits in the **right** kite — the opposite of what the old table drew. **The fix is a simple mirror**: every polygon/label coordinate below has its x mirrored (`x → 400 − x`) from the original table, with the same house numbers — nothing else about the geometry, the box shapes, or the sign-placement logic changes.
+
 This is the same North Indian diamond-chart algorithm already built, tested,
 and in production in this engagement's standalone reference app
-(`frontend/index.html`) — copy the geometry and logic exactly rather than
-inventing a new layout, so all three planet-bearing wheels (D1, Bhava Chalit,
-D9) stay visually and structurally consistent with each other and with the
-standalone app.
+(`frontend/index.html`, also corrected this round) — copy the geometry and
+logic exactly rather than inventing a new layout, so all four planet-bearing
+wheels (D1, Bhava Chalit, D9, Cuspal) stay visually and structurally
+consistent with each other and with the standalone app. **This fix applies
+to all four chart views** — they all draw from this one shared polygon
+table, so correcting it here corrects every one of them at once; there is
+no separate per-chart-type geometry to fix.
 
 **Geometry** — a 400×400 SVG viewBox. The diamond is an outer square plus
 both diagonals plus the diamond connecting the four side-midpoints. Houses
@@ -336,23 +390,26 @@ both diagonals plus the diamond connecting the four side-midpoints. Houses
 side-midpoints; the other 8 houses are the corner triangles the diagonals cut
 each corner into. House 1 (the ascendant's box) is always the top kite,
 regardless of which sign occupies it — this is what makes it "North Indian"
-style rather than a fixed-sign layout. Exact polygon points and label-center
+style rather than a fixed-sign layout. House numbers increase **counter-clockwise**
+from the top box — 2 and 3 are on the upper-left, 4 is the left kite, 5 and 6
+are lower-left, 7 is the bottom kite, 8 and 9 are lower-right, 10 is the
+right kite, 11 and 12 are upper-right. Exact polygon points and label-center
 coordinates for houses 1–12 (as SVG `<polygon points="...">` and text
-x/y):
+x/y — **corrected, mirrored table**):
 
 ```
-1:  polygon "200,0 100,100 200,200 300,100"   label (200, 95)
-2:  polygon "400,0 200,0 300,100"             label (300, 38)
-3:  polygon "400,0 400,200 300,100"           label (358, 100)
-4:  polygon "400,200 300,100 200,200 300,300" label (305, 200)
-5:  polygon "400,200 400,400 300,300"         label (358, 300)
-6:  polygon "400,400 200,400 300,300"         label (300, 362)
-7:  polygon "200,400 300,300 200,200 100,300" label (200, 305)
-8:  polygon "200,400 0,400 100,300"           label (100, 362)
-9:  polygon "0,400 0,200 100,300"             label (42, 300)
-10: polygon "0,200 100,300 200,200 100,100"   label (95, 200)
-11: polygon "0,200 0,0 100,100"               label (42, 100)
-12: polygon "0,0 200,0 100,100"               label (100, 38)
+1:  polygon "200,0 300,100 200,200 100,100"   label (200, 95)
+2:  polygon "0,0 200,0 100,100"               label (100, 38)
+3:  polygon "0,0 0,200 100,100"               label (42, 100)
+4:  polygon "0,200 100,100 200,200 100,300"   label (95, 200)
+5:  polygon "0,200 0,400 100,300"             label (42, 300)
+6:  polygon "0,400 200,400 100,300"           label (100, 362)
+7:  polygon "200,400 100,300 200,200 300,300" label (200, 305)
+8:  polygon "200,400 400,400 300,300"         label (300, 362)
+9:  polygon "400,400 400,200 300,300"         label (358, 300)
+10: polygon "400,200 300,300 200,200 300,100" label (305, 200)
+11: polygon "400,200 400,0 300,100"           label (358, 100)
+12: polygon "400,0 200,0 300,100"             label (300, 38)
 ```
 
 Draw all 12 polygons (house 1's box gets a subtle fill to mark it as the
@@ -360,7 +417,12 @@ ascendant; the rest transparent), then an outer 2px border rect, then a small
 "ASC ↑" label at the top-center (200, 14). Each house box's text: the sign
 abbreviation (first 3 letters) on the first line in the accent color, then
 one line per occupying planet's 2-letter code (append a small "ᴿ" superscript
-or similar retrograde mark if `retrograde` is true).
+or similar retrograde mark if `retrograde` is true). **Adopt the client's own
+per-planet color scheme** (see the new "Planet color and element scheme"
+section below) for each planet's code label here too, not just in the data
+table underneath — the wheel and the table should read as one consistent
+system, the way the client's own Excel chart does (colored planet codes
+inside the wheel boxes, the same colors reused in the table beneath it).
 
 **Which sign goes in which box, per chart type:**
 - **D1**: whole-sign houses starting from the ascendant's own sign. In
@@ -388,6 +450,86 @@ or similar retrograde mark if `retrograde` is true).
   but no planets — instead label each box with its cusp longitude (e.g.
   "20.19°") beneath the sign abbreviation, since the point of this chart is
   the cusp positions themselves.
+
+## Planet color scheme and the enriched Planet Details Table (new, 2026-09-24 latest)
+
+The client sent their own Excel Kundli chart as the reference for how much
+detail and what visual treatment a chart page should have, and asked that
+the site adopt "the best for client presentation" from it, applied to
+**every** reference chart view (D1, Bhava Chalit, D9, Cuspal), not only D1.
+`/api/chart`'s `planets` array gained four new fields this round — every
+one of them is a natal fact (this planet's actual position/relationships),
+so the SAME enriched table below is correct to show underneath all four
+wheel diagrams; only which house-box the planet is drawn in changes between
+the four chart types, not this table's content.
+
+**New fields on each entry in `/api/chart`'s `planets` array** (see the
+updated `/api/chart` contract further down for the full shape):
+- `degree_in_sign` — already existed, e.g. `25.512` (25°30′44″). Show
+  degrees/minutes/seconds or decimal degrees, either is fine, but show it
+  somewhere it wasn't before if your current table omits it.
+- `nakshatra` / `pada` — already existed. Show together as `"{nakshatra}({pada})"`,
+  e.g. `"Chitra(1)"`, matching the client's own Excel table's exact format.
+- `meaning` — **new**. One ready-to-render sentence, e.g. `"Chitra(1):
+  craftsmanship and a natural sense of design or charisma; Virgo adds
+  careful and detail-driven."` — put this straight into an "Interpretation"
+  / "Meaning" column, no client-side composition needed.
+- `conjunctions` — **new**. A list of `{code, orb_degrees}` for every other
+  planet sharing this one's D1 sign (empty if none). Render as a short
+  "Conj." column, e.g. `"Sa · 3.3°"` for a planet listing one conjunction,
+  joined with commas if there's more than one, or blank if the list is
+  empty — this is exactly the information a visitor needs to understand why
+  two planet codes appear stacked in the same house box.
+- `nature` — **new**. `"Malefic"` or `"Benefic"` (the Ascendant entry, if
+  you render one in this table, has no `nature` — the API only returns this
+  field on real planets, not the Ascendant/houses array). Use it to tint a
+  small badge or the row itself, consistent with the Flags column's own
+  badge treatment (see the existing "Retrograde and beta markers should be
+  visually distinct" guidance below).
+
+**A single planet-details table, one row per planet** (Ascendant + 9
+planets, same order as `/api/chart`'s `planets` array), with columns:
+**Planet · Sign/House · Degree · Nakshatra(Pada) · Flags · Nature ·
+Conjunctions · Meaning** — this mirrors the client's own Excel table's
+column set (Planet, Position, Degree, Flags, Nature, Nak/Pada,
+Interpretation) reordered slightly for readability, and should sit directly
+beneath each of the four chart wheels, using that chart type's own
+house-numbering convention in the "Sign/House" column (`rasi_house` for D1,
+`house` for Bhava Chalit, `navamsa_house` for D9, cusp number for Cuspal —
+same house-field rule as the wheel itself, see above). The "Flags" column
+isn't from `/api/chart` — it's the same `flags` array the Preview's
+placements table already renders (Retrograde/Combust/Exalted/Debilitated/
+Own Sign/Vargottama); if this table sits on a chart tab that doesn't already
+fetch `/api/teaser`, it's fine to leave Flags blank there rather than make
+an extra API call just for that one column — `/api/chart`'s own `retrograde`
+boolean is always available as a minimum.
+
+**Planet color scheme.** Adopt one consistent accent color per planet,
+reused everywhere that planet's code or name appears on the page (inside
+the chart wheel boxes, in this table, in the Preview's placements table,
+anywhere else) — this is what makes the client's own Excel chart easy to
+scan at a glance, and the live site currently doesn't do it (every planet
+renders in the same single accent color today). Pick the twelve colors from
+orbinovastro.com's own palette (don't import the Excel screenshot's exact
+hex values verbatim — those were tuned for a white Excel grid, not this
+site's theme) but keep the same STRUCTURE the client's reference uses:
+- A distinct hue per body: Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn,
+  Rahu, and Ketu each get their own color, consistent across every place
+  they're rendered on the page. (If the D9/Cuspal views also show Uranus/
+  Neptune/Pluto — they don't currently, `/api/chart` only returns the 9
+  classical grahas plus Ascendant — skip this for now.)
+- A light background tint per house box keyed to that box's sign's
+  classical element (fire: Aries/Leo/Sagittarius, earth: Taurus/Virgo/
+  Capricorn, air: Gemini/Libra/Aquarius, water: Cancer/Scorpio/Pisces) —
+  four subtle, distinct tints, consistent across all twelve boxes and all
+  four chart types. This is a purely decorative grouping (which element a
+  sign belongs to is standard, universally-agreed classical astrology, not
+  proprietary), so a small legend line near the wheel ("Fire · Earth · Air ·
+  Water", matching the client's own reference) is a nice touch but not
+  required.
+- The ascendant's own house box keeps its existing subtle highlight fill
+  (already specified above) on top of its element tint, so it still reads
+  as visually distinct from the other eleven boxes.
 
 ## Visual design pass — this is client-facing, raise the bar
 
@@ -491,7 +633,10 @@ Response (`ChartOut`):
       "code": "Su", "name": "Sun", "longitude": 175.5,
       "sign": "Virgo", "sign_lord": "Me", "degree_in_sign": 25.5,
       "nakshatra": "Chitra", "nakshatra_lord": "Ma", "pada": 1,
-      "retrograde": false, "house": 8, "rasi_house": 9
+      "retrograde": false, "house": 8, "rasi_house": 9,
+      "meaning": "Chitra(1): craftsmanship and a natural sense of design or charisma; Virgo adds careful and detail-driven.",
+      "conjunctions": [{"code": "Ur", "orb_degrees": 4.19}],
+      "nature": "Benefic"
     },
     "... 9 planets total: Su, Mo, Ma, Me, Ju, Ve, Sa, Ra, Ke"
   ],
@@ -502,6 +647,13 @@ Response (`ChartOut`):
 classical D1/Rasi whole-sign house placement. They can legitimately differ
 for a planet near a house cusp — see rule 5 above. Use `house` for the Bhava
 Chalit view and `rasi_house` for the D1 view.
+
+**New this round (2026-09-24, latest): `meaning`, `conjunctions`, and
+`nature`** — see the new "Planet color scheme and the enriched Planet
+Details Table" section above for exactly how to render these three, and
+note they apply to every chart view built from this endpoint's data (D1,
+Bhava Chalit, and — since D9/Cuspal ultimately describe the same natal
+planets — these too), not only the D1 tab.
 
 ### `POST /api/navamsa` (BETA)
 D9 Navamsa divisional chart — standard textbook formula (movable/fixed/dual
@@ -556,30 +708,33 @@ headline/blurb-only shape; every field below is present on every response:
   "moon_sign": "Pisces",
   "sun_sign": "Virgo",
   "headline": "Devang Naik rises in Capricorn, Moon in Pisces.",
-  "blurb": "A Capricorn ascendant carries quiet discipline -- composed, ambitious, patient in the way it builds. Paired with a Moon that dissolves easily into feeling -- an emotional world that is porous, dreamy, compassionate.",
-  "executive_summary": "Devang Naik's Ascendant (Lagna) -- the structural frame through which every other placement in this chart is expressed, and the significator of Self/Personality -- falls in Capricorn. A Capricorn ascendant carries quiet discipline -- composed, ambitious, patient in the way it builds. The Sun, seat of core identity and executive will, is placed in Virgo: A Sun in Virgo anchors identity in competence -- methodical, detail-oriented, defined by the standard of its own work. The Moon, governing cognitive and emotional processing, is placed in Pisces: Paired with a Moon that dissolves easily into feeling -- an emotional world that is porous, dreamy, compassionate. Ascendant, Sun, and Moon together form the chart's baseline operating profile -- the reference frame against which the full nine-planet, twelve-house structure below is read.",
+  "blurb": "A Capricorn ascendant carries quiet discipline: composed and ambitious, patient in the way it builds. Paired with a Moon that dissolves easily into feeling, an emotional world that's porous, dreamy, and compassionate.",
+  "executive_summary": "Devang Naik's chart opens with three placements that matter more than any other: Capricorn rising, Sun in Virgo, and Moon in Pisces. A Capricorn ascendant carries quiet discipline: composed and ambitious, patient in the way it builds. A Sun in Virgo anchors identity in competence, methodical and detail-oriented, defined by the standard of its own work. Paired with a Moon that dissolves easily into feeling, an emotional world that's porous, dreamy, and compassionate. Together, these three set the tone for everything else. The nine planets and twelve houses that follow are really the same story, told in more detail.",
   "placements": [
     {
       "code": "Asc", "name": "Ascendant", "sign": "Capricorn", "house": 1,
       "retrograde": false, "governs": "Self/Body", "house_domain": "Self/Personality",
-      "narrative": "The Ascendant -- karaka (significator) for Self/Body (core identity, physical vitality, and the outward expression of will) -- rises in Capricorn, defining the first house: Self/Personality (physical body, appearance, temperament, vitality, and overall approach to life). Every other placement in this chart is read relative to this one, making it the fixed reference point of the entire structure."
+      "narrative": "Your Ascendant rises in Capricorn (disciplined and patient). This practice calls it your Self/Body placement: it covers core identity, physical vitality, and the outward expression of will. It also defines your first house, the Self/Personality house, the part of life built around physical body, appearance, temperament, vitality, and overall approach to life. Think of it as the filter everything else in your chart passes through, your natural approach to life and the first impression you make on anyone you meet.",
+      "flags": []
     },
     {
-      "code": "Su", "name": "Sun", "sign": "Virgo", "house": 8,
-      "retrograde": false, "governs": "Soul/Vitality", "house_domain": "Transformation/Longevity",
-      "narrative": "Your Sun sits in Virgo (careful and detail-driven), right in your eighth house -- what this practice calls your Transformation/Longevity house, the part of life connected to life span, inheritance, hidden matters, sudden change, and occult interests. Sun itself represents inner life force, emotional security, and instinctive nurturing needs -- your Soul/Vitality -- so this is one of the places in life where that side of you shows up most clearly."
+      "code": "Ma", "name": "Mars", "sign": "Aries", "house": 3,
+      "retrograde": true, "governs": "Energy/Action", "house_domain": "Courage/Siblings",
+      "narrative": "Mars sits in Aries for you (bold and quick to act), landing in your third house. This practice calls it the Courage/Siblings house, the part of life connected to younger co-borns, communication skills, mental strength, short travels, and creative drive, and Mars itself represents your Energy/Action: drive, assertiveness, competitiveness, and the capacity to initiate and defend. Keep an eye here: it's where that instinct tends to play out in real life. This also happens to be one of Mars's own signs, a naturally comfortable and stable placement. This one is retrograde in your chart. In Vedic practice, that usually means the energy runs inward first, more reflection and revisiting before it shows up as action, not a weaker placement.",
+      "flags": ["Retrograde", "Own Sign"]
     }
-    // ... 8 more entries: Mo, Ma, Me, Ju, Ve, Sa, Ra, Ke, in that order,
+    // ... 8 more entries: Su, Mo, Me, Ju, Ve, Sa, Ra, Ke, in that order,
     // same shape as above. 10 entries total (Ascendant + 9 planets). Note
     // `sign` (D1/Rasi) and `house` (cuspal/Bhava Chalit) can legitimately
     // point at what looks like a "mismatched" pairing compared to a plain
     // whole-sign chart -- that's expected, see the update banner at the
-    // top of this doc.
+    // top of this doc. `flags` is usually an empty array -- most
+    // placements won't trigger any of these six markers.
   ],
-  "synthesis": "Viewed as a whole, this chart distributes its nine planetary placements across 8 of the twelve houses. 3 of 9 placements fall in the angular (kendra) houses -- the first, fourth, seventh, and tenth, the classical structural axis of self, home, partnership, and career -- and 2 of 9 fall in the trinal (trikona) houses -- the first, fifth, and ninth, associated with fortune, creativity, and higher purpose. These are structural counts, not a verdict of favorability: this preview describes WHERE each planet sits, not whether that placement is presently operating under supportive or adverse astrological pressure.",
-  "upgrade_pitch": "This is precisely where the free preview stops, by design. Placement -- which sign, which house, which of your twelve life domains each planet activates -- is descriptive fact, and it is shown above in full, across all nine planets and the Ascendant. What it does not yet tell you is how those placements interact: which houses are presently reinforced and which are under measurable stress, both in this natal chart and under today's transiting sky, and how your current planetary period (dasha) is activating specific placements right now. That quantified, house-by-house diagnostic -- built on this practice's own proprietary connection-and-stress scoring methodology -- is the core of the full Diagnostic Report, delivered as a complete written assessment, not a set of raw numbers.",
+  "synthesis": "Step back and look at the whole chart: your nine planets are spread across 8 of the twelve houses in your life. 1 of them sit in the four \"power houses\" (self, home, relationships, and career), and 3 fall in the luckiest, most fortune-linked houses in the chart. That's the shape of it. What it doesn't tell you is which of these areas are running smoothly for you right now and which ones are under real pressure. That's a completely different question, tied to your current planetary period and today's sky, and it's exactly what the full Diagnostic Report is built to answer.",
+  "upgrade_pitch": "Here's the honest split between what's free and what's not. Everything above tells you where each planet sits and what part of your life it touches. That's placement, and you now have all of it, for free. What it can't tell you is whether those placements are currently working in your favor, running under stress, or about to shift. That's a moving picture, driven by your current planetary period (dasha) and the sky right now, not a fixed one. Mapping that out, house by house and planet by planet, is exactly what the full Diagnostic Report does.",
   "book_url": "https://orbinovastro.square.site/s/appointments",
-  "disclaimer": "A free preview only -- which sign and house every planet occupies, and which of this practice's own real house/planet domains that activates. Sign (rashi) is your D1 (Rasi) birth chart placement. House (bhava) is cuspal (Bhava Chalit / Nirayana bhava) -- the same house convention this practice's KP significators and the paid Diagnostic Report's scoring use -- so a planet's house can differ from a simple whole-sign count: sometimes just one placement near a house cusp, and when the Ascendant itself sits close to a sign boundary, sometimes every placement shifted by a full house at once. Neither number is wrong -- they're two established, valid conventions answering slightly different questions. All positions are Nirayana (sidereal), from the validated mechanical layer. Deliberately does NOT include KP significators (see the beta significators feature), dasha/bhukti timing, or the proprietary connection-and-stress scoring (CCSI) that the full paid Diagnostic Report is built on -- this preview describes WHERE each planet sits, not whether that placement is currently under astrological support or stress."
+  "disclaimer": "A free preview only: which sign and house every planet occupies, and which of this practice's own real house/planet domains that activates. Sign (rashi) is your D1 (Rasi) birth chart placement. House (bhava) is cuspal (Bhava Chalit / Nirayana bhava), the same house convention this practice's KP significators and the paid Diagnostic Report's scoring use, so a planet's house can differ from a simple whole-sign count. Neither number is wrong. They're two established, valid conventions that answer slightly different questions. Each placement's Retrograde/Exalted/Debilitated/Own Sign flags use standard classical rules; Combust uses standard classical orbs; Vargottama compares this chart's D1 sign against its D9 Navamsa sign, so it carries the same beta caveat as the D9 feature. None of these flags are read from this practice's own Kundli worksheet, which computes them with its own unported formulas. All positions are Nirayana (sidereal), from the validated mechanical layer. Deliberately does not include KP significators, dasha/bhukti timing, or the proprietary connection-and-stress scoring (CCSI) the full paid Diagnostic Report is built on."
 }
 ```
 
@@ -591,7 +746,12 @@ for the full layout spec):
   signify for you) described in "What to build" item 2 above -- not cards,
   not a bulleted list. Include the static "Sign = D1 (Rasi)... House =
   cuspal (Bhava Chalit / Nirayana bhava)" caption line directly under the
-  section heading, per item 2 above.
+  section heading, per item 2 above. Each entry's `narrative` already
+  mentions any flag in prose, so `flags` (the new array -- see the update
+  banner at the top of this doc) is optional to render separately; if you
+  do add badges/chips for it, keep them small and consistent with the
+  existing retrograde-marker treatment, not a second competing visual
+  language.
 - `synthesis` — a closing paragraph, led with a bold "The larger pattern:"
   label per the approved reference.
 - `upgrade_pitch` — its own visually distinct block (this is the conversion
@@ -799,7 +959,14 @@ something Codex needs to handle.
    longitude with no planets. Cross-check the ascendant sign and a planet or
    two against a known reference chart. Confirm the wheels look consistent
    with each other (same size/style) and are legible on a narrow/phone-width
-   window.
+   window. **Orientation check (2026-09-24, latest again): for a chart with
+   Capricorn rising, Mars (which lands in Aries, house 4) must render in the
+   LEFT kite box, and Mercury (Libra, house 10) in the RIGHT kite box — if
+   they're swapped, the corrected mirrored polygon table wasn't applied.**
+   Also confirm each wheel's Planet Details Table beneath it shows Degree,
+   Nakshatra(Pada), Conjunctions, and Meaning for every planet, colored
+   consistently with the wheel's own planet-code colors (see the new
+   "Planet color scheme" section above), across all four views, not just D1.
 4. Compute KP significators for the same birth details — the "beta" label
    must be visible.
 5. Try the transit view with no date (defaults to now) and with a specific

@@ -709,7 +709,17 @@ BIRTH_DETAIL_FIELDS = [
 # Transit Location row that's never left blank (see
 # `overview_report_builder._transit_details_dict` for how these are
 # computed -- this list only says WHICH fields to render, not how).
+#
+# 2026-09-24, later still again: "Add which Transit is taken if the Transit
+# is taken Local/birthtime or other?" -- the client sent screenshots of a
+# real generated PDF and pointed out the table never said whether the shown
+# transit was the current moment (defaulted) or a custom date/time picked in
+# the Transit tab, nor whose "local" the Local rows meant. Added a first
+# "Transit Basis" row spelling both out in one plain-language sentence (see
+# `overview_report_builder._transit_basis_text`); purely declarative like
+# the rest of this list, so no rendering-code changes were needed.
 TRANSIT_DETAIL_FIELDS = [
+    ("transit_basis", "Transit Basis"),
     ("transit_date_local", "Transit Date (Local)"),
     ("transit_time_local", "Transit Time (Local)"),
     ("transit_place", "Transit Location"),

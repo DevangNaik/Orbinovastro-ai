@@ -192,7 +192,21 @@ def get_ayanamsa_deg(jd_ut: float, mode: int = AYANAMSA_MODE) -> float:
 
 def compute_planet(code: str, jd_ut: float, mode: int = AYANAMSA_MODE) -> PlanetPosition:
     """Sidereal longitude + sign/nakshatra breakdown for one planet.
-    Rahu is the true lunar node; Ketu is always exactly 180 deg from Rahu."""
+    Rahu is the true lunar node; Ketu is always exactly 180 deg from Rahu.
+
+    BUG FIXED (2026-09-24, latest): Rahu was never marked retrograde.
+    Ketu (the special-cased branch just below) has always correctly been
+    hardcoded `retrograde=True` -- by convention, not measured, since the
+    lunar nodes are computational points, not physical bodies, and Vedic
+    practice treats them as permanently retrograde. Rahu instead fell
+    through to the general branch, where the old line
+    `retrograde = speed_long < 0 and code not in ("Ra", "Ke")` explicitly
+    forced it to `False` no matter what Swiss Ephemeris' own speed
+    reported -- an inconsistency with Ketu, caught by the client noticing
+    Rahu never showed the retrograde marker while Ketu (always exactly
+    180 degrees away) always did. Fixed by hardcoding Rahu to `True` too,
+    the same convention Ketu already used, rather than reading its
+    (usually-but-not-always negative) true-node speed."""
     set_ayanamsa(mode)
     if code == "Ke":
         rahu = compute_planet("Ra", jd_ut, mode)
@@ -209,7 +223,7 @@ def compute_planet(code: str, jd_ut: float, mode: int = AYANAMSA_MODE) -> Planet
     longitude = normalize360(longitude)
     sign, sign_lord, deg_in_sign = sign_for_longitude(longitude)
     nak, nak_lord, pada = nakshatra_for_longitude(longitude)
-    retrograde = speed_long < 0 and code not in ("Ra", "Ke")
+    retrograde = True if code == "Ra" else speed_long < 0
     return PlanetPosition(code, PLANET_FULL_NAME[code], longitude, sign,
                            sign_lord, deg_in_sign, nak, nak_lord, pada, retrograde)
 

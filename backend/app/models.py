@@ -20,6 +20,11 @@ class BirthDetailsIn(BaseModel):
     place: str = Field("", description="Optional place name, for display only")
 
 
+class PlanetConjunctionOut(BaseModel):
+    code: str = Field(description="The other planet's code")
+    orb_degrees: float = Field(description="Angular separation in degrees, always positive")
+
+
 class PlanetOut(BaseModel):
     code: str
     name: str
@@ -33,6 +38,23 @@ class PlanetOut(BaseModel):
     retrograde: bool
     house: int = Field(description="Bhava Chalit house (Placidus cusp), used by KP practice")
     rasi_house: int = Field(description="Classical D1/Rasi house (whole-sign, from the ascendant's sign)")
+    meaning: str = Field(
+        description="One short sentence combining this placement's nakshatra theme and sign "
+        "color, e.g. 'Sravana(4): listening, learning, and passing on what you know; Capricorn "
+        "adds disciplined and patient.' Standard classical textbook material (see "
+        "engine/chart_narrative.py), not the client's own proprietary Kundli-worksheet "
+        "interpretation text."
+    )
+    conjunctions: list[PlanetConjunctionOut] = Field(
+        default_factory=list,
+        description="Every other planet sharing this one's D1 (Rasi) sign -- the same grouping "
+        "a North Indian chart box visually shows -- with the angular separation in degrees, "
+        "closest first. Empty if nothing else shares the sign.",
+    )
+    nature: str = Field(
+        description="'Malefic' or 'Benefic' -- standard classical grouping (Sa/Ma/Ra/Ke vs. "
+        "Su/Me/Mo/Ju/Ve), the same one this engine's CCSI weighting already uses internally."
+    )
 
 
 class HouseOut(BaseModel):
@@ -98,6 +120,14 @@ class TeaserPlacementOut(BaseModel):
     governs: str = Field(description="Short signification label, from the client's own real HIT_CALC wording")
     house_domain: str = Field(description="Short house life-area label, from the client's own real HIT_CALC wording")
     narrative: str = Field(description="Full analytical sentence(s) for this specific placement")
+    flags: list[str] = Field(
+        default_factory=list,
+        description="Zero or more of 'Retrograde' / 'Combust' / 'Exalted' / 'Debilitated' / "
+        "'Own Sign' / 'Vargottama', computed from standard classical rules (not read from the "
+        "client's own Kundli worksheet, which uses its own unported Excel formulas for these -- "
+        "see engine/teaser.py's module docstring). 'Vargottama' depends on the D9 Navamsa chart, "
+        "which is itself labeled beta elsewhere in this app.",
+    )
 
 
 class TeaserOut(BaseModel):
@@ -125,24 +155,31 @@ class TeaserOut(BaseModel):
     )
     book_url: str
     disclaimer: str = (
-        "A free preview only -- which sign and house every planet occupies, "
+        "A free preview only: which sign and house every planet occupies, "
         "and which of this practice's own real house/planet domains that "
         "activates. Sign (rashi) is your D1 (Rasi) birth chart placement. "
-        "House (bhava) is cuspal (Bhava Chalit / Nirayana bhava) -- the same "
+        "House (bhava) is cuspal (Bhava Chalit / Nirayana bhava), the same "
         "house convention this practice's KP significators and the paid "
-        "Diagnostic Report's scoring use -- so a planet's house can differ "
-        "from a simple whole-sign count: sometimes just one placement near a "
-        "house cusp, and when the Ascendant itself sits close to a sign "
-        "boundary, sometimes every placement shifted by a full house at "
-        "once. Neither number is wrong -- they're two established, valid "
-        "conventions answering slightly different questions. All "
-        "positions are Nirayana (sidereal), from the validated mechanical "
-        "layer. Deliberately does NOT include KP significators (see the "
-        "beta significators feature), dasha/bhukti timing, or the "
-        "proprietary connection-and-stress scoring (CCSI) that the full "
-        "paid Diagnostic Report is built on -- this preview describes "
-        "WHERE each planet sits, not whether that placement is currently "
-        "under astrological support or stress."
+        "Diagnostic Report's scoring use, so a planet's house can differ "
+        "from a simple whole-sign count. Sometimes it's just one placement "
+        "near a house cusp; when the Ascendant itself sits close to a sign "
+        "boundary, every placement can shift by a full house at once. "
+        "Neither number is wrong. They're two established, valid "
+        "conventions that answer slightly different questions. Each "
+        "placement's Retrograde/Exalted/Debilitated/Own Sign flags use "
+        "standard classical rules; Combust uses standard classical orbs; "
+        "Vargottama compares this chart's D1 sign against its D9 Navamsa "
+        "sign, so it carries the same beta caveat as the D9 feature (a "
+        "standard textbook formula, not yet checked against this "
+        "practice's own workbook). None of these flags are read from this "
+        "practice's own Kundli worksheet, which computes them with its own "
+        "unported formulas. All positions are Nirayana (sidereal), from "
+        "the validated mechanical layer. Deliberately does not include KP "
+        "significators (see the beta significators feature), dasha/bhukti "
+        "timing, or the proprietary connection-and-stress scoring (CCSI) "
+        "the full paid Diagnostic Report is built on. It describes where "
+        "each planet sits, not whether that placement is currently under "
+        "astrological support or stress."
     )
 
 

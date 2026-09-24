@@ -234,3 +234,123 @@ def test_teaser_module_never_imports_the_proprietary_scoring_engines():
     forbidden = {"hit_calc", "ccsi", "scoring", "dasha", "kp_lords"}
     leaked = imported_modules & forbidden
     assert not leaked, f"teaser.py must not import {leaked}"
+
+
+# --- New this round: Retrograde/Combust/Exalted/Debilitated/Own Sign/
+# Vargottama flags (2026-09-24, latest) -----------------------------------
+
+def test_angular_separation_is_correct_including_the_360_wrap():
+    from app.engine.teaser import _angular_separation
+    assert _angular_separation(10.0, 10.0) == 0.0
+    assert _angular_separation(10.0, 20.0) == 10.0
+    assert _angular_separation(350.0, 10.0) == 20.0  # wraps past 360
+    assert _angular_separation(0.0, 180.0) == 180.0  # opposite points
+
+
+def test_combust_flag_matches_a_known_combust_chart():
+    """The 1947-08-15 reference chart has Venus and Saturn genuinely close
+    enough to the Sun to be combust under the standard orbs this module
+    uses (5.43 and 7.52 degrees separation respectively, against 10 and 15
+    degree orbs) -- locked in as a real, hand-verified example rather than
+    a synthetic one, so a future change to the orb table or the separation
+    math can't silently break this without a test noticing."""
+    chart = _reference_chart()
+    teaser = build_teaser(chart)
+    by_code = {p.code: p for p in teaser.placements}
+    assert "Combust" in by_code["Ve"].flags
+    assert "Combust" in by_code["Sa"].flags
+    # And planets clearly far from the Sun in this same chart must NOT be
+    # flagged combust, so this isn't a test that would pass no matter what.
+    assert "Combust" not in by_code["Ma"].flags
+    assert "Combust" not in by_code["Ju"].flags
+
+
+def test_sun_and_nodes_are_never_flagged_combust():
+    """Combustion is specifically a Sun-proximity effect on a physical
+    planet -- the Sun can't be combust with itself, and the lunar nodes
+    are excluded by design (see _COMBUSTION_ORBS)."""
+    for chart in (_reference_chart(), _real_client_reference_chart()):
+        teaser = build_teaser(chart)
+        by_code = {p.code: p for p in teaser.placements}
+        assert "Combust" not in by_code["Su"].flags
+        assert "Combust" not in by_code["Ra"].flags
+        assert "Combust" not in by_code["Ke"].flags
+
+
+def test_dignity_flags_match_the_known_real_reference_chart():
+    """Cross-checks against this engagement's own already-established
+    facts about the client's real reference chart: Jupiter sits in
+    Capricorn (its classical sign of debilitation) and Mars sits in Aries
+    (one of its own signs) -- both already narrated in teaser.py's
+    _dignity_note before this round, now also checked as structured
+    flags."""
+    chart = _real_client_reference_chart()
+    teaser = build_teaser(chart)
+    by_code = {p.code: p for p in teaser.placements}
+    assert "Debilitated" in by_code["Ju"].flags
+    assert "Own Sign" in by_code["Ma"].flags
+    # Rahu/Ketu deliberately never get a dignity flag (see _DIGNITY's own
+    # docstring on why the nodes are excluded).
+    assert not ({"Exalted", "Debilitated", "Own Sign"} & set(by_code["Ra"].flags))
+    assert not ({"Exalted", "Debilitated", "Own Sign"} & set(by_code["Ke"].flags))
+
+
+def test_vargottama_flag_matches_an_independent_d1_vs_d9_sign_check():
+    """Recomputes Vargottama independently (D1 sign index vs. D9 Navamsa
+    sign index, via the same already-built, already-beta-labeled
+    varga.navamsa_sign_index this module reuses) for every placement in
+    the real reference chart, rather than hardcoding an expected true/false
+    list by hand -- catches a wiring bug regardless of which specific
+    planets happen to be Vargottama for this particular chart."""
+    from app.engine.ephemeris import sign_index_for_longitude
+    from app.engine.varga import navamsa_sign_index
+
+    chart = _real_client_reference_chart()
+    teaser = build_teaser(chart)
+
+    expected_asc = (
+        sign_index_for_longitude(chart.ascendant.longitude)
+        == navamsa_sign_index(chart.ascendant.longitude)
+    )
+    asc_placement = next(p for p in teaser.placements if p.code == "Asc")
+    assert ("Vargottama" in asc_placement.flags) == expected_asc
+
+    for planet in chart.planets:
+        expected = (
+            sign_index_for_longitude(planet.longitude)
+            == navamsa_sign_index(planet.longitude)
+        )
+        placement = next(p for p in teaser.placements if p.code == planet.code)
+        assert ("Vargottama" in placement.flags) == expected, planet.code
+
+
+def test_retrograde_flag_and_boolean_field_always_agree():
+    """The structured `flags` list and the existing `retrograde` boolean
+    field must never disagree -- guards against the two being wired from
+    different sources by accident."""
+    for chart in (_reference_chart(), _real_client_reference_chart()):
+        teaser = build_teaser(chart)
+        for p in teaser.placements:
+            assert ("Retrograde" in p.flags) == p.retrograde
+
+
+def test_flags_are_mentioned_in_narrative_prose_when_present():
+    """Every flag that appears in the structured list should also be
+    reflected in the plain-language narrative text somewhere, so the two
+    representations (structured badges vs. prose) never silently diverge."""
+    chart = _real_client_reference_chart()
+    teaser = build_teaser(chart)
+    for p in teaser.placements:
+        lower = p.narrative.lower()
+        if "Retrograde" in p.flags:
+            assert "retrograde" in lower
+        if "Combust" in p.flags:
+            assert "combust" in lower
+        if "Vargottama" in p.flags:
+            assert "vargottama" in lower
+        if "Debilitated" in p.flags:
+            assert "debilitat" in lower
+        if "Exalted" in p.flags:
+            assert "exalt" in lower
+        if "Own Sign" in p.flags:
+            assert "own sign" in lower or "own signs" in lower

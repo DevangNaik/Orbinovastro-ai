@@ -133,6 +133,47 @@ def test_transit_details_dict_custom_offset_needs_no_shift():
     assert details["transit_time_utc"] == "4:05 AM UTC"
 
 
+def test_transit_details_dict_basis_defaults_to_now_at_birth_location():
+    # 2026-09-24, later still again: the client sent screenshots of a real
+    # generated PDF asking whether the shown transit was "Local/birthtime
+    # or other" -- `source` defaults to "now" for any caller that hasn't
+    # been updated to pass it (matches _resolve_natal_and_transit_moments'
+    # own default), and the resulting sentence should name the birth
+    # location explicitly rather than leaving "local" ambiguous.
+    transit_moment = BirthMoment(year=2026, month=9, day=24, hour=4, minute=4, second=0,
+                                  utc_offset_hours=0.0, latitude=20.8156, longitude=72.9595)
+    details = _transit_details_dict(transit_moment, "Amalsad, Gujarat, India", 5.5)
+
+    assert "transit_basis" in details
+    assert "current moment" in details["transit_basis"].lower()
+    assert "Amalsad, Gujarat, India" in details["transit_basis"]
+    assert "birth location" in details["transit_basis"].lower()
+
+
+def test_transit_details_dict_basis_names_a_custom_transit():
+    transit_moment = BirthMoment(year=2026, month=9, day=14, hour=23, minute=5, second=0,
+                                  utc_offset_hours=-5.0, latitude=33.9566391, longitude=-83.989006)
+    details = _transit_details_dict(transit_moment, "Duluth, GA", -5.0, source="custom")
+
+    assert "custom" in details["transit_basis"].lower()
+    assert "Transit tab" in details["transit_basis"]
+    assert "Duluth, GA" in details["transit_basis"]
+    # A custom transit's basis sentence should not claim it's the "current
+    # moment" -- that phrasing is reserved for the defaulted case.
+    assert "current moment" not in details["transit_basis"].lower()
+
+
+def test_transit_details_dict_basis_falls_back_when_place_is_blank():
+    # Mirrors the existing "never blank place" discipline for transit_place
+    # itself -- the basis sentence should still read sensibly rather than
+    # naming an empty location.
+    transit_moment = BirthMoment(year=2026, month=9, day=24, hour=4, minute=4, second=0,
+                                  utc_offset_hours=0.0, latitude=20.8156, longitude=72.9595)
+    details = _transit_details_dict(transit_moment, "", 5.5, source="custom")
+    assert details["transit_basis"] != ""
+    assert "the transit location shown below" in details["transit_basis"]
+
+
 def test_house_and_planet_labels_are_complete_and_real():
     # 2026-09-24, later still: the client sent the real HIT_CALC "LIFE AREA"
     # row (12 house cells + 10 Asc/planet cells), so overview_labels.py now
@@ -305,3 +346,27 @@ def test_build_overview_report_pdf_end_to_end_with_fake_openai_client():
     # carries the placeholder flag or the extra placeholder-caveat sentence.
     assert result.labels_are_placeholder is False
     assert "placeholder" not in result.disclaimer.lower()
+
+
+def test_build_overview_report_pdf_end_to_end_with_custom_transit_source():
+    # 2026-09-24, later still again: confirms transit_source threads all the
+    # way through build_overview_report_pdf() -> _transit_details_dict()
+    # without error for the "custom" case too, not just the default "now".
+    natal_moment = BirthMoment(
+        year=1973, month=10, day=12, hour=14, minute=55, second=0,
+        utc_offset_hours=5.5,
+        latitude=20.815615264029468, longitude=72.95947488134223,
+    )
+    transit_moment = BirthMoment(
+        year=2026, month=9, day=14, hour=23, minute=5, second=0,
+        utc_offset_hours=-5.0, latitude=33.9566391, longitude=-83.989006,
+    )
+    result = build_overview_report_pdf(
+        _FakeOpenAIClient(), "Test Client", natal_moment, transit_moment,
+        birth_place="Amalsad, Gujarat, India",
+        transit_place="Duluth, GA",
+        transit_display_offset_hours=-5.0,
+        transit_source="custom",
+    )
+    assert result.pdf_bytes.startswith(b"%PDF")
+    assert len(result.pdf_bytes) > 5000

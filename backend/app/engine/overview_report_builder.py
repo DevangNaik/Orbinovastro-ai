@@ -163,7 +163,23 @@ def _shift_wall_clock(moment: BirthMoment, delta_hours: float) -> _datetime:
     return dt + _timedelta(hours=delta_hours)
 
 
-def _transit_details_dict(moment: BirthMoment, place: str, display_offset_hours: float) -> dict:
+def _transit_basis_text(source: str, place: str) -> str:
+    """2026-09-24, later still again: the client sent screenshots of a real
+    generated PDF asking "which Transit is taken if the Transit is taken
+    Local/birthtime or other?" -- the table showed a Local/UTC time pair
+    but never said WHOSE "local" it was, or whether it was the current
+    moment (defaulted) versus a custom date/time set in the Transit tab.
+    Returns a single plain-language sentence for a new first row in the
+    Transit Information table that answers both questions at once."""
+    where = place or "the transit location shown below"
+    if source == "custom":
+        return f"A custom date/time you set in the Transit tab, evaluated at {where}."
+    return f"The current moment as of report generation (no custom transit was set), evaluated at {where}, your birth location."
+
+
+def _transit_details_dict(
+    moment: BirthMoment, place: str, display_offset_hours: float, source: str = "now",
+) -> dict:
     """Builds the Transit Information table's fields, showing BOTH the
     local time at `display_offset_hours` (the transit's actual location --
     the birth location when defaulted, or the custom transit's own location
@@ -171,7 +187,12 @@ def _transit_details_dict(moment: BirthMoment, place: str, display_offset_hours:
     see this module's UPDATE (2026-09-24, later still) docstring note for
     why both are shown rather than one ambiguous, unlabeled time. `moment`
     itself may be stored at any offset (its own `utc_offset_hours`); both
-    displayed times are derived from the same underlying instant."""
+    displayed times are derived from the same underlying instant.
+
+    `source` ("now" or "custom", from `_resolve_natal_and_transit_moments`)
+    drives the new `transit_basis` field -- see `_transit_basis_text()` --
+    added 2026-09-24 after the client asked for exactly this distinction to
+    be shown in the PDF."""
     local_dt = _shift_wall_clock(moment, display_offset_hours - moment.utc_offset_hours)
     utc_dt = _shift_wall_clock(moment, -moment.utc_offset_hours)
 
@@ -179,6 +200,7 @@ def _transit_details_dict(moment: BirthMoment, place: str, display_offset_hours:
     utc_hour12, utc_ampm = _hour_12h(utc_dt.hour)
 
     return {
+        "transit_basis": _transit_basis_text(source, place),
         "transit_date_local": local_dt.strftime("%d %B %Y"),
         "transit_time_local": f"{local_hour12}:{local_dt.minute:02d} {local_ampm}",
         "transit_place": place or "",
@@ -203,6 +225,7 @@ def build_overview_report_pdf(
     birth_place: str = "",
     transit_place: str = "",
     transit_display_offset_hours: float | None = None,
+    transit_source: str = "now",
 ) -> OverviewReportResult:
     """Computes the CCSI report live, calls OpenAI for the interpretation/
     guidance layer, and renders the Stage-1 core Overview Report PDF (no
@@ -217,7 +240,14 @@ def build_overview_report_pdf(
     to be built with (0.0/UTC for the "now" default -- see this module's
     2026-09-24 UPDATE docstring note). Defaults to `transit_moment`'s own
     offset if not given, which reproduces the pre-fix behavior for any
-    caller that hasn't been updated to pass this."""
+    caller that hasn't been updated to pass this.
+
+    `transit_source`: "now" or "custom", from
+    `_resolve_natal_and_transit_moments`'s own third return value -- drives
+    the new Transit Basis row (see `_transit_details_dict`). Defaults to
+    "now" for any caller that hasn't been updated to pass this, which
+    matches the pre-this-change behavior of never showing a custom-transit
+    basis."""
     ccsi_report = compute_ccsi_report(natal_moment, transit_moment)
     parsed = build_parsed_from_ccsi(ccsi_report)
     report_data = generate_overview_data(client, client_name, parsed)
@@ -226,7 +256,9 @@ def build_overview_report_pdf(
         transit_display_offset_hours = transit_moment.utc_offset_hours
 
     birth_details = _birth_details_dict(natal_moment, birth_place)
-    transit_details = _transit_details_dict(transit_moment, transit_place, transit_display_offset_hours)
+    transit_details = _transit_details_dict(
+        transit_moment, transit_place, transit_display_offset_hours, transit_source,
+    )
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         output_path = Path(tmp_dir) / "overview_report.pdf"

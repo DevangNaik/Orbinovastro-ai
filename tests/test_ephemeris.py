@@ -46,6 +46,21 @@ def test_rahu_ketu_are_exactly_opposite():
     assert diff < 0.001
 
 
+def test_rahu_and_ketu_are_both_marked_retrograde():
+    """Regression test for a real bug the client caught by reading the
+    Preview output: Ketu was always correctly hardcoded retrograde=True
+    (lunar nodes are permanently retrograde by Vedic convention, not
+    measured), but Rahu fell through to the general per-planet branch,
+    whose old logic explicitly forced Rahu's retrograde flag to False
+    regardless of Swiss Ephemeris' own reported speed. Fixed so both
+    nodes are always retrograde, consistently, for every chart."""
+    chart = _reference_chart()
+    rahu = next(p for p in chart.planets if p.code == "Ra")
+    ketu = next(p for p in chart.planets if p.code == "Ke")
+    assert rahu.retrograde is True
+    assert ketu.retrograde is True
+
+
 def test_longitudes_are_normalized():
     chart = _reference_chart()
     for p in chart.planets:
