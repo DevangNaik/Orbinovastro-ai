@@ -242,93 +242,72 @@ astrology math itself.
 >    circular chart. Full geometry below — this is a genuinely new shape,
 >    not a tweak, so it's specified in full rather than "figure it out."
 >
-> **Bi-wheel geometry.** The existing single diamond (see "Chart wheel
-> diagram" below) is unchanged and stays exactly as-is elsewhere (D1, Bhava
-> Chalit, D9, Cuspal all keep their single-diamond wheel). This bi-wheel is
-> an ADDITION specific to the Transit tab, drawn ABOVE the existing
-> "Planetary transits" table (keep that table too — it still carries detail
-> the chart doesn't, like retrograde/conjunct-natal text). Structure: a
-> scaled-down copy of the existing diamond in the middle (natal, inner ring)
-> surrounded by a new 12-segment outer ring (transit) — 8 plain trapezoid
-> "frame" segments for the 8 non-kendra houses (2,3,5,6,8,9,11,12), plus 4
-> slender kite-shaped "spikes" poking through gaps in the frame for the 4
-> kendra houses (1,4,7,10) — kendra houses in a North Indian diamond only
-> ever touch the outer boundary at a single point (not a stretch of edge, as
-> the corner-triangle houses do — this is why they need their own spike
-> shape rather than a trapezoid; a plain concentric square ring alone leaves
-> them with zero-width cells). The result reads as a square frame with four
-> small diamond points poking out at N/E/S/W, not a perfect circle-like
-> ring — an honest, buildable adaptation of the reference's *concept*
-> (natal inside, transit outside), not its circular *shape*.
+> ~~**Bi-wheel geometry.** ... a new 12-segment outer ring (transit) — 8
+> plain trapezoid "frame" segments ... plus 4 slender kite-shaped "spikes"
+> ...~~ **SUPERSEDED (2026-09-25) — the tessellated ring is gone, replaced
+> by a simpler open layout below.** The client built the tessellated-ring
+> version (screenshot confirmed it worked — house placement, stacking order,
+> and colors were all correct), then compared it against the JHora reference
+> chart again and asked to match that reference's layout more closely,
+> specifically: *"the Rashi is aligned then Transit Planets are placed
+> according to transit in outer side of Inner rectangle"* — i.e. the
+> reference doesn't actually draw a second ring of closed cells at all; it
+> keeps ONE diamond (natal) and simply floats each transit planet's label in
+> the open space outside it, positioned toward the direction of whichever
+> house it's transiting, with no drawn boundary around each label. That's
+> also simpler to build than the tessellated ring, and sidesteps the
+> cramped-spike crowding issue a kendra house with 2+ transit occupants had
+> in the tessellated version (nothing here to overflow, since there's no
+> enclosing shape).
 >
-> **Worked example (viewBox `0 0 600 600`, feel free to adjust the exact
-> pixel values for visual polish — the STRUCTURE and which points connect to
-> which is what matters):**
+> **Open bi-wheel layout (viewBox `0 0 600 600`, adjust pixels for polish —
+> the STRUCTURE matters, not the exact numbers):**
 >
-> Inner diamond (natal) — exactly the existing single-diamond polygon table
-> from "Chart wheel diagram" below, scaled by 0.65 and shifted +170,+170
-> (i.e. every `(x,y)` becomes `(0.65x+170, 0.65y+170)`). Same house shapes,
-> same rules (Rashi number, planet-label chips, element colors, stacking
-> order, everything already specified) — nothing new to build here besides
-> the resize. Key reference points this produces: `N=(300,170)
-> E=(430,300) S=(300,430) W=(170,300)` (the four kendra kite tips) and
-> `corner_NW=(170,170) corner_NE=(430,170) corner_SE=(430,430)
-> corner_SW=(170,430)`.
+> Inner diamond (natal) — unchanged from the tessellated version: the
+> existing single-diamond polygon table from "Chart wheel diagram" below,
+> scaled by 0.65 and shifted +170,+170 (`(x,y)` → `(0.65x+170, 0.65y+170)`).
+> Same house shapes, same rules (Rashi number, planet-label chips, element
+> colors, stacking order) — nothing new here. Center: `C=(300,300)`.
 >
-> Outer square frame corners: `(40,40) (560,40) (560,560) (40,560)`. Each
-> side's frame trapezoid stops 40px short of that side's midpoint, leaving
-> an 80px gap for the spike. The 8 frame trapezoids (each connects one inner
-> edge — corner-to-N/E/S/W — to the matching gapped outer edge):
+> For each house 1–12, there's already a label-center point in the base
+> "Chart wheel diagram" polygon table below (e.g. house 1's is `(200,95)` in
+> the original 400×400 table). Transform it the same way as the inner
+> diamond (`(x,y)` → `(0.65x+170, 0.65y+170)`) to get that house's own
+> direction from `C` — then place the OUTER (transit) anchor for that house
+> at distance 260px from `C`, along that exact same direction (i.e.
+> normalize `(transformed_label − C)` to a unit vector, multiply by 260, add
+> back `C`). This keeps every outer anchor precisely aligned with its
+> house's own Rashi/position on the inner diamond — "the Rashi is aligned"
+> — rather than an arbitrary even 30°-per-house spacing. Worked-out anchor
+> points using this formula (safe to use directly):
 > ```
-> House 2:  (40,40)   (260,40)  (300,170) (170,170)
-> House 12: (340,40)  (560,40)  (430,170) (300,170)
-> House 3:  (40,40)   (170,170) (170,300) (40,260)
-> House 11: (560,260) (430,300) (430,170) (560,40)
-> House 5:  (40,340)  (170,300) (170,430) (40,560)
-> House 9:  (560,560) (430,430) (430,300) (560,340)
-> House 6:  (40,560)  (260,560) (300,430) (170,430)
-> House 8:  (340,560) (560,560) (430,430) (300,430)
+> House 1:  (300,40)    House 2:  (163,79)   House 3:  (80,161)
+> House 4:  (40,300)    House 5:  (80,439)   House 6:  (163,521)
+> House 7:  (300,560)   House 8:  (437,521)  House 9:  (520,439)
+> House 10: (560,300)   House 11: (520,161)  House 12: (437,79)
 > ```
-> (each row is a 4-point polygon, in order — connect back to the first
-> point to close it)
+> Optional but recommended: draw one thin, light (low-opacity, decorative
+> only) straight guide line from each house's point on the inner diamond's
+> own perimeter out to its outer anchor above, echoing the reference's
+> radiating spokes — this is just a visual aid, not a boundary; nothing is
+> enclosed by it, and it can be omitted if it clutters the print layout.
 >
-> The 4 kendra spikes (kite shape: inner tip as base, two "shoulder" points
-> sitting on the outer frame's gap edges, one tip poking past the frame):
-> ```
-> House 1 (N): base (300,170)  shoulders (260,40)/(340,40)   tip (300,5)
-> House 4 (W): base (170,300)  shoulders (40,260)/(40,340)   tip (5,300)
-> House 7 (S): base (300,430)  shoulders (260,560)/(340,560) tip (300,595)
-> House 10(E): base (430,300)  shoulders (560,260)/(560,340) tip (595,300)
-> ```
-> (polygon order: base → one shoulder → tip → other shoulder → close)
->
-> Every shared edge between a frame trapezoid and its neighboring spike uses
-> the identical two points (e.g. House 2's trapezoid and House 1's spike
-> both use `(260,40)` and `(300,170)`) — this is what makes the ring
-> tessellate with no gaps or overlaps; keep them numerically identical, not
-> just visually close.
->
-> **Placing transit planets in the ring.** `/api/transit`'s response
-> already tells you exactly which ring segment each transit planet belongs
-> in — its `natal_house` field (1-12), using the SAME house numbering as
-> the inner diamond (no new mapping to figure out). Render each transit
-> planet's label using the SAME compact format already specified for the
-> inner diamond's planet labels (`{code}{(R)} {DegreeInSign}°{Minutes}′
-> {NakshatraAbbrev}`  — transit planets have no nakshatra pada exposed
-> separately from the inner-diamond format, reuse it as-is), but visually
-> distinguish transit from natal so they're never confused at a glance:
-> a dashed border on the chip instead of solid (this also survives
-> black-and-white printing, unlike a color-only distinction — see the print
-> note below), or a small "T" tag before the label. When a ring segment
-> holds more than one transit planet, stack them the same fixed classical
-> order already used for the inner diamond (Su, Mo, Ma, Me, Ju, Ve, Sa, Ra,
-> Ke — the three outer planets aren't in `/api/transit`'s response at all,
-> nothing to place for them here). Color each transit label chip the same
-> `planet_element`-based color as its natal counterpart (Su/Ma=Fire etc. —
-> `/api/chart`'s per-planet element mapping applies identically to the same
-> planet transiting; it's a fixed fact about the planet, not the chart) —
-> one consistent legend covers both rings, no separate transit color key
-> needed.
+> **Placing transit planets.** `/api/transit`'s `natal_house` field (1–12,
+> same numbering as the inner diamond) tells you which outer anchor point
+> each transiting planet's label goes at — no ring-cell lookup needed any
+> more, just point lookup by house number from the table above. Render each
+> label in the SAME compact format as the inner diamond's planet labels
+> (`{code}{(R)} {DegreeInSign}°{Minutes}′ {NakshatraAbbrev}` — transit
+> planets have no separate pada exposed, reuse the format as-is), still
+> visually distinguished from natal with a dashed chip border and/or a small
+> "T" tag (that part worked well, keep it), still colored by
+> `planet_element` (one shared legend for both). When a house has more than
+> one transit occupant, stack them as a small vertical list anchored at that
+> same point (top-aligned, growing outward/downward — same fixed classical
+> order already used elsewhere: Su, Mo, Ma, Me, Ju, Ve, Sa, Ra, Ke), same as
+> how the inner diamond already stacks multiple occupants in one box — just
+> without a polygon confining them, so there's no overflow risk even with 2+
+> occupants at a kendra point.
 >
 > **Print.** The client asked for this to be printable. Make sure the SVG
 > scales cleanly at print resolution (viewBox-based, no fixed pixel
@@ -682,6 +661,12 @@ already-formatted string.
    screenshot; swap in their exact values if theirs differ, same
    discipline as this engagement's other not-yet-client-confirmed
    conventions (e.g. `functional_nature`).
+   **Check this specifically (2026-09-25):** a live screenshot of the D1
+   wheel showed a chip reading `Bra4` for what should be a Bharani
+   nakshatra entry — this table says `Bha`, not `Bra`. Grep the actual
+   nakshatra-abbreviation lookup in the codebase for a typo (`Bra` instead
+   of `Bha`) rather than assuming the screenshot was misread; fix it if
+   it's there.
 5. **Condition flags** (`D↓` debilitated, `E↑` exalted, `C^` combust,
    `V▫` vargottama) -- straight from the `flags` array (minus
    `R*`/Retrograde, point 3), shown only when that specific flag is
