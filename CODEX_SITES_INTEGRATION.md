@@ -202,6 +202,34 @@ astrology math itself.
 >    imply otherwise in the UI (e.g. no "recalculating for your location"
 >    spinner that suggests the chart itself changes) — it's a display/
 >    time-zone correctness fix, not a different chart.
+>
+> **UPDATE (2026-09-25) — add a "Use My Location" button.** Live and working
+> exactly as spec'd above (confirmed against the client's own screenshot) —
+> one addition: next to "Look up coordinates," add a **"Use My Location"**
+> button that calls the browser's own geolocation API instead of a place-name
+> search:
+> - `navigator.geolocation.getCurrentPosition(...)` → fill Latitude/Longitude
+>   directly from `coords.latitude`/`coords.longitude`. This also
+>   auto-unchecks "Same as birth location" (using current location only
+>   makes sense when it's being set explicitly).
+> - **UTC offset: read it from the browser's own clock, not a geocode
+>   lookup** — `-(new Date().getTimezoneOffset() / 60)` gives the visitor's
+>   actual current local UTC offset (DST-aware, matches this form's existing
+>   sign convention — e.g. EST/UTC-5 → `-5`). This is more reliable than
+>   reverse-geocoding coordinates into a timezone, and needs no new backend
+>   endpoint.
+> - **Leave "Transit place" blank** rather than fabricating a place name —
+>   `/api/geocode` only does forward lookup (name → coordinates), there's no
+>   reverse lookup built, and guessing a city name from coordinates isn't
+>   this feature's job. `transit_place` already falls back to showing the
+>   raw coordinates when `place` is omitted (see the `/api/transit` contract
+>   above) — that fallback is the correct, honest display here, not a gap to
+>   fill in.
+> - Geolocation requires a secure context (HTTPS — already true for this
+>   site) and the visitor's permission. If they decline, or the browser
+>   doesn't support it, show a small inline message and leave the manual
+>   search/fields exactly as they already work — never block the rest of the
+>   form on this.
 > 2. *"The Transit Chart needs to have two chart Natal and Transit together
 >    so inner is Natal and outer is Transit... squares can extend the lanes
 >    so that inner square and outer square can be used as transit planet
