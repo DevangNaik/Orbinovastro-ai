@@ -310,12 +310,43 @@ class TransitDetailsIn(BaseModel):
     day: int | None = Field(None, ge=1, le=31)
     hour: int | None = Field(None, ge=0, le=23)
     minute: int | None = Field(None, ge=0, le=59)
-    utc_offset_hours: float = 0.0
+    utc_offset_hours: float = Field(
+        0.0,
+        description=(
+            "Timezone offset of the hour/minute/year/month/day fields above "
+            "-- i.e. these fields are already LOCAL time at this offset, not "
+            "UTC. Only meaningful when year is supplied (a custom transit "
+            "moment); ignored otherwise."
+        ),
+    )
+    latitude: float | None = Field(
+        None,
+        description=(
+            "UPDATE (2026-09-25): location the transit's own houses/degrees "
+            "are computed for -- e.g. wherever the visitor actually is right "
+            "now, which need not be the birth location. Omitted = same "
+            "location as the natal birth details (the previous, only "
+            "behavior)."
+        ),
+    )
+    longitude: float | None = None
+    place: str = Field(
+        "",
+        description=(
+            "Optional display name for the transit location (e.g. 'Duluth, "
+            "GA'), for the Transit tab to show alongside the computed "
+            "positions -- same idea as BirthDetailsIn.place. If omitted and "
+            "no custom transit is given, the birth's own place name is used "
+            "instead (that's the actual location being used); if omitted "
+            "with a custom lat/long, the coordinates are shown instead of "
+            "leaving this blank -- see TransitOut.transit_place."
+        ),
+    )
 
 
 class TransitRequestIn(BaseModel):
     birth: BirthDetailsIn
-    transit: TransitDetailsIn | None = None  # None/omitted = right now, in UTC
+    transit: TransitDetailsIn | None = None  # None/omitted = right now, at the birth location
 
 
 class TransitPlanetOut(BaseModel):
@@ -338,6 +369,23 @@ class TransitPlanetOut(BaseModel):
 class TransitOut(BaseModel):
     transit_time_utc: str
     transit_time_source: str
+    transit_place: str = Field(
+        description=(
+            "UPDATE (2026-09-25): the actual location this transit was "
+            "computed for, always a real display string (a place name, or "
+            "coordinates as a fallback) -- never blank, same convention "
+            "already used by the Overview Report PDF's Transit Information "
+            "table (see main.py's _resolve_transit_display_info)."
+        ),
+    )
+    transit_utc_offset_hours: float = Field(
+        description=(
+            "The UTC offset that transit_place's own LOCAL time should be "
+            "shown at -- the birth's own offset when the transit defaults to "
+            "the birth location, or the custom transit's own offset when one "
+            "was given."
+        ),
+    )
     planets: list[TransitPlanetOut]
     disclaimer: str = (
         "Mechanical-layer transit only: current sidereal planetary positions "

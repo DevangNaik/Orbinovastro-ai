@@ -157,10 +157,158 @@ astrology math itself.
 > the earlier instruction, remove it.** The corrected, final rule: "Get My
 > Full Report" reuses the exact date/time currently held by the page's ONE
 > existing Transit tab -- it does not get its own date/time input at all.
-> The transit location is always the birth chart's own location, full stop
+> ~~The transit location is always the birth chart's own location, full stop
 > -- never ask the visitor for a separate transit location anywhere on this
-> page. See the rewritten item 3 under "What to build" and the rewritten
+> page.~~ **SUPERSEDED (2026-09-25) -- see the "Transit tab upgrade" section
+> below: the client explicitly reversed this. The Transit tab now DOES ask
+> for its own local time AND local coordinates, same as Birth Details.** The
+> "one Transit input, not two" rule itself still stands -- there is still
+> only ONE place on the page to set the transit moment, and "Get My Full
+> Report" still reuses whatever that one Transit tab currently holds
+> (including its own location now, not just its date/time) -- only the
+> "always the birth location" half of the old rule is gone. See the
+> rewritten item 3 under "What to build" and the rewritten
 > `/api/overview-report` request section below for the specifics.
+
+> **UPDATE (2026-09-25) -- Transit tab upgrade: local time AND local
+> coordinates (like Birth Details), plus a new natal+transit bi-wheel
+> diamond chart.** Two client requests, read together:
+>
+> 1. *"It should be able to accept the Local time and Local cordinates just
+>    like Birth Input."* The Transit tab currently only has a date/time
+>    field and a UTC-offset number — no latitude/longitude, no location
+>    search. `/api/transit`'s `transit` object now accepts `latitude`/
+>    `longitude`/`place` (see the updated `POST /api/transit` contract
+>    above) — give the Transit tab the exact same location-input UX Birth
+>    Details already has: a text search box that calls `/api/geocode`
+>    (already built, already used by Birth Details — same endpoint, don't
+>    build a second one) to resolve a typed place name into latitude,
+>    longitude, and the correct UTC offset for that place on that date, with
+>    manual latitude/longitude/UTC-offset fields as a fallback for a visitor
+>    who wants to type coordinates directly. Add a "Same as birth location"
+>    checkbox, **checked by default** (this is what keeps every existing
+>    behavior — the Preview/Chart tabs, KP Significators, and "Get My Full
+>    Report" — unchanged unless the visitor deliberately unchecks it): when
+>    checked, hide the location fields and simply omit `latitude`/
+>    `longitude`/`place` from the request (defaults to the birth location,
+>    exactly like today); when unchecked, reveal the search box + manual
+>    fields and send whatever they resolve to.
+>    **One real fact worth knowing before you build this:** this engine's
+>    planetary longitudes are geocentric (same instant in UTC = same
+>    sign/nakshatra for every planet, everywhere on Earth) — changing the
+>    transit location does NOT change any planet's computed position, only
+>    which local time zone "now" (or a typed date/time) is interpreted in,
+>    and the `transit_place`/`transit_utc_offset_hours` display text. Don't
+>    imply otherwise in the UI (e.g. no "recalculating for your location"
+>    spinner that suggests the chart itself changes) — it's a display/
+>    time-zone correctness fix, not a different chart.
+> 2. *"The Transit Chart needs to have two chart Natal and Transit together
+>    so inner is Natal and outer is Transit... squares can extend the lanes
+>    so that inner square and outer square can be used as transit planet
+>    placement."* A new bi-wheel version of the North Indian diamond,
+>    specific to the Transit tab: natal planets on the existing inner
+>    diamond, transit planets on a new outer ring around it. The client
+>    attached a real third-party chart (a circular JHora-style dual wheel)
+>    **as inspiration only, explicitly not as the visual theme to copy** —
+>    build this in the site's own existing square/diamond style, not a
+>    circular chart. Full geometry below — this is a genuinely new shape,
+>    not a tweak, so it's specified in full rather than "figure it out."
+>
+> **Bi-wheel geometry.** The existing single diamond (see "Chart wheel
+> diagram" below) is unchanged and stays exactly as-is elsewhere (D1, Bhava
+> Chalit, D9, Cuspal all keep their single-diamond wheel). This bi-wheel is
+> an ADDITION specific to the Transit tab, drawn ABOVE the existing
+> "Planetary transits" table (keep that table too — it still carries detail
+> the chart doesn't, like retrograde/conjunct-natal text). Structure: a
+> scaled-down copy of the existing diamond in the middle (natal, inner ring)
+> surrounded by a new 12-segment outer ring (transit) — 8 plain trapezoid
+> "frame" segments for the 8 non-kendra houses (2,3,5,6,8,9,11,12), plus 4
+> slender kite-shaped "spikes" poking through gaps in the frame for the 4
+> kendra houses (1,4,7,10) — kendra houses in a North Indian diamond only
+> ever touch the outer boundary at a single point (not a stretch of edge, as
+> the corner-triangle houses do — this is why they need their own spike
+> shape rather than a trapezoid; a plain concentric square ring alone leaves
+> them with zero-width cells). The result reads as a square frame with four
+> small diamond points poking out at N/E/S/W, not a perfect circle-like
+> ring — an honest, buildable adaptation of the reference's *concept*
+> (natal inside, transit outside), not its circular *shape*.
+>
+> **Worked example (viewBox `0 0 600 600`, feel free to adjust the exact
+> pixel values for visual polish — the STRUCTURE and which points connect to
+> which is what matters):**
+>
+> Inner diamond (natal) — exactly the existing single-diamond polygon table
+> from "Chart wheel diagram" below, scaled by 0.65 and shifted +170,+170
+> (i.e. every `(x,y)` becomes `(0.65x+170, 0.65y+170)`). Same house shapes,
+> same rules (Rashi number, planet-label chips, element colors, stacking
+> order, everything already specified) — nothing new to build here besides
+> the resize. Key reference points this produces: `N=(300,170)
+> E=(430,300) S=(300,430) W=(170,300)` (the four kendra kite tips) and
+> `corner_NW=(170,170) corner_NE=(430,170) corner_SE=(430,430)
+> corner_SW=(170,430)`.
+>
+> Outer square frame corners: `(40,40) (560,40) (560,560) (40,560)`. Each
+> side's frame trapezoid stops 40px short of that side's midpoint, leaving
+> an 80px gap for the spike. The 8 frame trapezoids (each connects one inner
+> edge — corner-to-N/E/S/W — to the matching gapped outer edge):
+> ```
+> House 2:  (40,40)   (260,40)  (300,170) (170,170)
+> House 12: (340,40)  (560,40)  (430,170) (300,170)
+> House 3:  (40,40)   (170,170) (170,300) (40,260)
+> House 11: (560,260) (430,300) (430,170) (560,40)
+> House 5:  (40,340)  (170,300) (170,430) (40,560)
+> House 9:  (560,560) (430,430) (430,300) (560,340)
+> House 6:  (40,560)  (260,560) (300,430) (170,430)
+> House 8:  (340,560) (560,560) (430,430) (300,430)
+> ```
+> (each row is a 4-point polygon, in order — connect back to the first
+> point to close it)
+>
+> The 4 kendra spikes (kite shape: inner tip as base, two "shoulder" points
+> sitting on the outer frame's gap edges, one tip poking past the frame):
+> ```
+> House 1 (N): base (300,170)  shoulders (260,40)/(340,40)   tip (300,5)
+> House 4 (W): base (170,300)  shoulders (40,260)/(40,340)   tip (5,300)
+> House 7 (S): base (300,430)  shoulders (260,560)/(340,560) tip (300,595)
+> House 10(E): base (430,300)  shoulders (560,260)/(560,340) tip (595,300)
+> ```
+> (polygon order: base → one shoulder → tip → other shoulder → close)
+>
+> Every shared edge between a frame trapezoid and its neighboring spike uses
+> the identical two points (e.g. House 2's trapezoid and House 1's spike
+> both use `(260,40)` and `(300,170)`) — this is what makes the ring
+> tessellate with no gaps or overlaps; keep them numerically identical, not
+> just visually close.
+>
+> **Placing transit planets in the ring.** `/api/transit`'s response
+> already tells you exactly which ring segment each transit planet belongs
+> in — its `natal_house` field (1-12), using the SAME house numbering as
+> the inner diamond (no new mapping to figure out). Render each transit
+> planet's label using the SAME compact format already specified for the
+> inner diamond's planet labels (`{code}{(R)} {DegreeInSign}°{Minutes}′
+> {NakshatraAbbrev}`  — transit planets have no nakshatra pada exposed
+> separately from the inner-diamond format, reuse it as-is), but visually
+> distinguish transit from natal so they're never confused at a glance:
+> a dashed border on the chip instead of solid (this also survives
+> black-and-white printing, unlike a color-only distinction — see the print
+> note below), or a small "T" tag before the label. When a ring segment
+> holds more than one transit planet, stack them the same fixed classical
+> order already used for the inner diamond (Su, Mo, Ma, Me, Ju, Ve, Sa, Ra,
+> Ke — the three outer planets aren't in `/api/transit`'s response at all,
+> nothing to place for them here). Color each transit label chip the same
+> `planet_element`-based color as its natal counterpart (Su/Ma=Fire etc. —
+> `/api/chart`'s per-planet element mapping applies identically to the same
+> planet transiting; it's a fixed fact about the planet, not the chart) —
+> one consistent legend covers both rings, no separate transit color key
+> needed.
+>
+> **Print.** The client asked for this to be printable. Make sure the SVG
+> scales cleanly at print resolution (viewBox-based, no fixed pixel
+> container), and don't rely on color alone to separate natal from transit
+> (see the dashed-border note above) since printed output may be
+> black-and-white. A print stylesheet that hides the interactive controls
+> (date/time inputs, "Calculate transits" button) and keeps just the chart +
+> table is a nice touch but not required unless it's easy.
 
 ## Why this shape (read this before building)
 
@@ -313,16 +461,21 @@ and Preview / Chart / Transit / KP Significators / Chat tabs):
      in the `/api/overview-report` request entirely (same meaning it
      already has for `/api/transit`). If the visitor has set a specific
      date/time in the Transit tab, send that exact value.
-   - **Transit location is always the birth chart's own location — never
+   - ~~Transit location is always the birth chart's own location — never
      ask the visitor for a separate transit location anywhere on this
-     page.** Simply omit `transit.latitude`/`longitude`/`place` from the
-     request always; the backend defaults them to the birth details
-     automatically. There is nothing to toggle and nothing to sync — this
-     is just always true.
-   - Net effect: the only thing that varies in the `transit` object across
-     requests is the date/time, taken directly from the Transit tab's
-     current state; everything else about "transit" for this report is
-     simply "the birth chart's own location."
+     page.~~ **SUPERSEDED (2026-09-25) — see the "Transit tab upgrade"
+     section above: the Transit tab now has its own local time AND local
+     coordinates input, same as Birth Details.** This report reuses whatever
+     the Transit tab currently holds, location included — when its "Same as
+     birth location" checkbox is checked (the default), omit
+     `transit.latitude`/`longitude`/`place` exactly as before; when
+     unchecked, send the Transit tab's resolved latitude/longitude/place
+     here too, same values you'd send to `/api/transit` for that same tab
+     state.
+   - Net effect: the `transit` object sent here should always be a byte-for-
+     byte match of what you'd send to `/api/transit` for the exact same
+     Transit tab state (minus `/api/transit`-only fields, there are none) —
+     date/time AND location both, never diverging between the two calls.
 4. A **Chart** view, expanded into **four linked reference charts** sharing
    one set of planet data from a single `/api/chart` call plus one
    `/api/navamsa` call — each one drawn as a real **North Indian chart-wheel
@@ -356,10 +509,17 @@ and Preview / Chart / Transit / KP Significators / Chat tabs):
    visible on the view — a one-line note near the disclaimer is enough (this
    engine only ever computes sidereal positions; the label just makes that
    explicit for anyone comparing against a Western/tropical chart elsewhere).
-5. A **Transit** view: an optional date/time picker (blank = right now), calls
-   `/api/transit`, shows each planet's current sign/nakshatra, which natal
-   house it's transiting, and any conjunctions with natal planets. (Already
-   live — keep as-is.)
+5. A **Transit** view: an optional date/time picker (blank = right now),
+   ~~calls `/api/transit`, shows each planet's current sign/nakshatra, which
+   natal house it's transiting, and any conjunctions with natal planets.
+   (Already live — keep as-is.)~~ **UPDATED (2026-09-25) — see the "Transit
+   tab upgrade" section above for the full spec: add a location input
+   (search box via `/api/geocode` + manual lat/long, behind a "Same as birth
+   location" checkbox checked by default) alongside the existing date/time
+   picker, and add the new natal+transit bi-wheel diamond chart above the
+   existing results table.** The existing table (sign/nakshatra/natal
+   house/conjunctions) stays exactly as it is today — this is additive, not
+   a replacement.
 6. A **KP Significators (beta)** view: calls `/api/kp-beta`, shows each
    planet's Sub Lord and the 4-level house significators, with the beta
    disclaimer prominently shown. (Already live — keep as-is.)
@@ -776,6 +936,27 @@ this applied) -- the rule from here on:
 This is a labeling/priority change only -- both fields were already
 correctly computed and returned by `/api/chart` before this UPDATE box;
 nothing on the backend changes here.
+
+**UPDATE (2026-09-24, newest of all) -- the header's Ayanamsa label was
+showing internal engineering shorthand to real end users.** Client flagged
+the live site's header (`Ascendant: Capricorn` / `Ayanamsa: Krishnamurti
+VP291 + confirmed diff`) as confusing: "confirmed diff" means nothing to
+someone reading their own chart -- it referred to an internal validation
+detail (an empirically-confirmed adjustment this engine applies to the
+Krishnamurti VP291 ayanamsa, documented in the backend's own code, not a
+second ayanamsa or a user-facing distinction). **Fixed entirely
+server-side** -- `/api/chart`'s `ayanamsa_mode` field now returns the
+plain string `"Krishnamurti VP291"` (no `"+ confirmed diff"` suffix). The
+underlying ayanamsa value/degrees are completely unchanged -- only the
+label text changed.
+
+**Nothing for Codex to change.** If your header is built by interpolating
+`data.ayanamsa_mode` directly (e.g. `` `Ayanamsa: ${data.ayanamsa_mode}` ``
+-- confirmed this is how the existing header works), the cleaned-up label
+appears automatically the next time a chart is computed after this backend
+change deploys. Do not hardcode "Krishnamurti VP291" as a literal string
+anywhere in place of reading the field -- keep reading it from the API
+response, in case the ayanamsa mode itself is ever changed later.
 
 **UPDATE (2026-09-24, latest):** client feedback on the live "Conj. /
 Aspects" cell -- the three stacked lines (`Conj:` / `Aspects:` /
@@ -1317,7 +1498,7 @@ Response (`ChartOut`):
 ```json
 {
   "name": "", "place": "",
-  "ayanamsa_deg": 23.94, "ayanamsa_mode": "Krishnamurti VP291 + confirmed diff",
+  "ayanamsa_deg": 23.94, "ayanamsa_mode": "Krishnamurti VP291",
   "ascendant": {
     "house": 1, "longitude": 294.8, "sign": "Capricorn", "sign_lord": "Sa",
     "degree_in_sign": 24.8, "nakshatra": "Dhanishta", "nakshatra_lord": "Ma", "pada": 3,
@@ -1525,22 +1706,38 @@ Response (`KPBetaOut`):
 ```
 
 ### `POST /api/transit`
+**UPDATE (2026-09-25): `transit` now also accepts `latitude`/`longitude`/
+`place` — see the "Transit tab upgrade" section below for the full story
+(this reverses the earlier "transit location is always the birth location,
+never ask the visitor" rule; that rule is superseded, not this doc's mistake
+this time — the client's own new instruction).** Still fully backward
+compatible: omit them (or omit `transit` entirely) and it behaves exactly as
+before, defaulting to the birth's own location.
+
 Request (`TransitRequestIn`) — `transit` is optional; omit it (or omit its
-`year`) to mean "right now":
+`year`) to mean "right now, at the birth location":
 ```json
 {
   "birth": { "...same BirthDetailsIn shape as above..." },
   "transit": {
     "year": 2026, "month": 12, "day": 25,
-    "hour": 0, "minute": 0, "utc_offset_hours": 5.5
+    "hour": 0, "minute": 0, "utc_offset_hours": 5.5,
+    "latitude": 33.9566391, "longitude": -83.989006,
+    "place": "Duluth, GA"
   }
 }
 ```
+`latitude`/`longitude`/`place` are all optional — omit all three to use the
+birth's own location (old behavior, unchanged). Get them the same way Birth
+Details gets its own — a text search box calling `/api/geocode`, see below.
+
 Response (`TransitOut`):
 ```json
 {
   "transit_time_utc": "2026-12-24T18:30:00+00:00",
   "transit_time_source": "custom",
+  "transit_place": "Duluth, GA",
+  "transit_utc_offset_hours": 5.5,
   "planets": [
     {
       "code": "Su", "name": "Sun", "longitude": 248.8,
@@ -1553,6 +1750,10 @@ Response (`TransitOut`):
   "disclaimer": "Mechanical-layer transit only: ... (show this to the user)"
 }
 ```
+`transit_place`/`transit_utc_offset_hours` are new — always a real display
+string and offset (never blank), same convention as the Overview Report
+PDF's own Transit Information block. Render them next to the transit
+results, e.g. "Transit computed for Duluth, GA (UTC-5:00)".
 
 ### `POST /api/chat` (non-streaming) and `POST /api/chat/stream` (SSE)
 Request (`ChatRequestIn`):
@@ -1616,11 +1817,16 @@ tab's current state:
   exact value, with whatever UTC offset the Transit tab itself uses for it
   (mirroring the birth details' own `utc_offset_hours` is fine, same as
   `/api/transit` already does).
-- **Never send `latitude`/`longitude`/`place` on this request.** Leave them
-  out always, every time -- the backend automatically uses the birth
-  details' own location when they're absent, which is exactly the
-  behavior wanted here. There is no transit-location control on this page
-  at all.
+- ~~Never send `latitude`/`longitude`/`place` on this request. Leave them
+  out always, every time... There is no transit-location control on this
+  page at all.~~ **SUPERSEDED (2026-09-25) — see the "Transit tab upgrade"
+  section above: the Transit tab now DOES have its own location control.**
+  This request already accepts `latitude`/`longitude`/`place` on `transit`
+  (this endpoint's request model always had these fields — nothing new to
+  add server-side) — send them here too, whenever the Transit tab's "Same
+  as birth location" checkbox is unchecked, mirroring exactly what you send
+  to `/api/transit` for the same tab state. Checkbox checked (the default)
+  → omit all three, exactly as before, using the birth's own location.
 
 Response on success: **not JSON** — a raw PDF binary
 (`Content-Type: application/pdf`, `Content-Disposition: attachment;

@@ -246,30 +246,30 @@ def api_teaser(body: BirthDetailsIn) -> TeaserOut:
 def api_transit(body: TransitRequestIn, _user=Depends(require_active_subscription)) -> TransitOut:
     """Mechanical-layer transit: current (or given-moment) planetary
     positions placed against the natal chart's houses. See engine/transit.py
-    module docstring for exactly what this is and isn't."""
+    module docstring for exactly what this is and isn't.
+
+    UPDATE (2026-09-25): this used to always compute the transit moment at
+    the BIRTH's own coordinates, even when a custom transit was given --
+    there was nowhere on TransitDetailsIn to say "I'm somewhere else right
+    now." Client asked for the Transit tab to accept its own local time AND
+    local coordinates, the same way Birth Details does. Fixed by giving
+    TransitDetailsIn the same latitude/longitude/place fields
+    CcsiTransitDetailsIn already has, and switching this endpoint to the
+    same shared _resolve_natal_and_transit_moments /
+    _resolve_transit_display_info helpers /api/ccsi and /api/overview-report
+    already use -- one resolution rule for "where is this transit actually
+    happening," not three slightly-different copies of it. Backward
+    compatible: omitting transit (or its latitude/longitude) still defaults
+    to the birth's own location exactly as before."""
     try:
+        natal_moment, transit_moment, source = _resolve_natal_and_transit_moments(body.birth, body.transit)
         natal_chart = build_chart_from_fields(
-            year=body.birth.year, month=body.birth.month, day=body.birth.day,
-            hour=body.birth.hour, minute=body.birth.minute, second=body.birth.second,
-            utc_offset_hours=body.birth.utc_offset_hours,
-            latitude=body.birth.latitude, longitude=body.birth.longitude,
+            year=natal_moment.year, month=natal_moment.month, day=natal_moment.day,
+            hour=natal_moment.hour, minute=natal_moment.minute, second=natal_moment.second,
+            utc_offset_hours=natal_moment.utc_offset_hours,
+            latitude=natal_moment.latitude, longitude=natal_moment.longitude,
         )
-        t = body.transit
-        if t is None or t.year is None:
-            transit_moment = now_as_birth_moment(body.birth.latitude, body.birth.longitude)
-            source = "now (UTC)"
-        else:
-            if t.month is None or t.day is None or t.hour is None or t.minute is None:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Custom transit moment needs year, month, day, hour, and minute.",
-                )
-            transit_moment = BirthMoment(
-                year=t.year, month=t.month, day=t.day, hour=t.hour, minute=t.minute,
-                utc_offset_hours=t.utc_offset_hours,
-                latitude=body.birth.latitude, longitude=body.birth.longitude,
-            )
-            source = "custom"
+        transit_place, transit_offset = _resolve_transit_display_info(body.birth, body.transit, transit_moment)
         planets, iso_ts = compute_transit(natal_chart, transit_moment)
     except HTTPException:
         raise
@@ -278,6 +278,7 @@ def api_transit(body: TransitRequestIn, _user=Depends(require_active_subscriptio
 
     return TransitOut(
         transit_time_utc=iso_ts, transit_time_source=source,
+        transit_place=transit_place, transit_utc_offset_hours=transit_offset,
         planets=[TransitPlanetOut(**vars(p)) for p in planets],
     )
 
